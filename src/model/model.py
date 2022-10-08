@@ -12,26 +12,52 @@ class ImageEncoder(nn.Module):
         self.model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32').vision_model.to(self.device)
 
     def forward(self, image):
-        # check size
-        # if more than 1 image - use self.processor.batch_decode
+        # only one image at a time
         image = self.preprocessor(images=image, return_tensors='pt').to(self.device)
         image_features = self.model(**image)
         
         return image_features.pooler_output
 
 class Mapping(nn.Module):
-    def __init__(self, embed_size, device='cpu'):
+    def __init__(
+        self, 
+        num_layers,
+        embed_size, 
+        n_heads, 
+        forward_expansion, 
+        dropout, 
+        device='cpu'
+    ):
         super(Mapping, self).__init__()
         
         self.device = device
 
         self.transformer_encoder = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=embed_size, nhead=16),
-            num_layers=6
+            nn.TransformerEncoderLayer(
+                d_model=embed_size, 
+                nhead=n_heads, 
+                dim_feedforward=embed_size*forward_expansion, 
+                dropout=dropout, 
+                batch_first=True, 
+                device=device
+            ),
+            num_layers=num_layers
         ).to(self.device)
+
+        self.init_weights()
 
     def forward(self, img_embedded):
         return self.transformer_encoder(img_embedded)
+
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
+                nn.init.zeros_(m.bias)
+
+            elif isinstance(m, nn.LayerNorm):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
 
 class TextDecoder(nn.Module):
     def __init__(self, device='cpu'):
@@ -45,88 +71,123 @@ class TextDecoder(nn.Module):
         self.model = GPT2LMHeadModel.from_pretrained('gpt2').to(self.device)
 
     def forward(self, embedding):
-        # text = self.tokenizer(text, padding=True, return_tensors='pt').to(self.device)
         text_features = self.model(inputs_embeds=embedding)
         
         return text_features.logits
 
 class Net(nn.Module):
-    def __init__(self, max_len):
+    def __init__(self, num_layers, n_heads, forward_expansion, dropout, max_len, device='cpu'):
         super(Net, self).__init__()
-       
 
         self.ie = ImageEncoder()
-        self.mp = Mapping(self.ie.model.config.hidden_size)
+        self.mp = Mapping(num_layers=num_layers, embed_size=self.ie.model.config.hidden_size, n_heads=n_heads, forward_expansion=forward_expansion, dropout=dropout, device=device)
         self.td = TextDecoder()
 
         assert self.ie.model.config.hidden_size == self.td.model.config.n_embd, "Embedding size of models mismatch"
 
         self.max_len = max_len
 
+        self.criterion = nn.CrossEntropyLoss(ignore_index=self.td.tokenizer.pad_token_id)
+
+        self.freeze_layers()
+
+    def freeze_layers(self):
+        for p in *list(self.ie.parameters()), *list(self.td.parameters())[14:-14]: # freeze everything, except 1st and last transformer layer in Decoder
+            p.requires_grad = False
+
     def forward(self, img):
+        # only one image at a time
 
-        img_embedded = self.ie(img)
+        self.ie.eval()
+        self.mp.eval()
+        self.td.eval()
 
-        # (1, embed_size)
-        img_mapped = self.mp(img_embedded)
-        sos_emb = self.td.model.transformer.wte(torch.tensor(self.td.tokenizer.bos_token_id))
-        # sos_emb shape embed_size -> (1, embed_size)
+        with torch.no_grad():
+            img_embedded = self.ie(img)
 
-        sos_emb = sos_emb.expand_as(img_mapped)
-        # (2, embed_size)
-        start_emb = torch.cat([sos_emb, img_mapped], dim=0)
-
-        tokens = []
-        for _ in range(self.max_len):
-            if len(tokens):
-                tok_emb = self.td.model.transformer.wte(torch.tensor(tokens))
-
-                emb = torch.cat([start_emb, tok_emb], dim=0)
-            else:
-                emb = start_emb
-
-            # add positional enc
+            # (1, embed_size)
+            img_mapped = self.mp(img_embedded)
+            sos_emb = self.td.model.transformer.wte(torch.tensor(self.td.tokenizer.bos_token_id))
             
-            pos_emb = self.td.model.transformer.wpe(torch.arange(emb.shape[0]).to(self.td.device))
+            # sos_emb shape embed_size -> (1, embed_size)
+            sos_emb = sos_emb.expand_as(img_mapped)
 
-            emb += pos_emb
-            pred = self.td(emb)
+            # (2, embed_size)
+            start_emb = torch.cat([sos_emb, img_mapped], dim=0)
 
-            _, pred = torch.max(pred, dim=1)
+            tokens = []
+            for _ in range(self.max_len):
+                if len(tokens):
+                    tok_emb = self.td.model.transformer.wte(torch.tensor(tokens))
 
-            last_token = pred[-1].item()
+                    emb = torch.cat([start_emb, tok_emb], dim=0)
+                else:
+                    emb = start_emb
 
-            tokens.append(last_token)
+                # add positional enc
+                pos_emb = self.td.model.transformer.wpe(torch.arange(emb.shape[0]).to(self.td.device))
 
-            if last_token == self.td.tokenizer.eos_token_id:
-                break
+                emb += pos_emb
+                pred = self.td(emb)
 
-        return tokens
+                _, pred = torch.max(pred, dim=1)
 
-    def train(self, img, trg_capt):
+                last_token = pred[-1].item()
+
+                tokens.append(last_token)
+
+                if last_token == self.td.tokenizer.eos_token_id:
+                    break
+
+            return tokens
+
+    def train_forward(self, img_emb, trg_capt):
         # method should get embedded by CLIP images and trg_text without last token.
         # dataset should contain image, embedded image, text
 
-        # img - N, 3, 224, 224
-        img_embedded = self.ie.model(pixel_values=img)
+        self.mp.train()
+        self.td.train()
 
-        print(img_embedded.shape)
-        img_mapped = self.mp(img_embedded)
-        print(img_mapped.shape)
+        x = trg_capt[:, :-1]
+        y = trg_capt[:, 1:]
+
+        # img_emb - (N, embed_size)
+        # trg_capt - (N, len)
+        img_mapped = self.mp(img_emb)
 
         # N, 1, embed_size
         img_mapped = img_mapped.unsqueeze(1)
-        print(img_mapped.shape)
-
-        sos_emb = self.td.model.transformer.wte(torch.tensor(self.td.tokenizer.bos_token_id))
-        print(sos_emb.shape)
-        sos_emb = sos_emb.expand_as(img_mapped)
-        print(sos_emb.shape)
 
         # embed all texts and con cat with map sos
+        text_emb = self.td.model.transformer.wte(trg_capt[:, :-1])
 
-        x = torch.concat([sos_emb, img_mapped], dim=1)
-        print(x.shape)
+        # N, len, embed_size
+        x = torch.concat([img_mapped, text_emb], dim=1)
+
+        pos_emb = self.td.model.transformer.wpe(torch.arange(x.shape[1]).to(self.td.device))
+        pos_emb = pos_emb.expand_as(x)
+
+        x += pos_emb
+
+        # N, len, vocab_size
         res = self.td(x)
-        print(res.shape)
-        return torch.softmax(res, dim=2)
+        res = torch.softmax(res, dim=2)
+
+        loss = self.criterion(res[:, 1:, :].reshape(-1, res.shape[-1]), y.reshape(-1))
+        
+        return loss
+
+if __name__ == '__main__':
+    
+    m = Net(
+        num_layers=6,
+        n_heads=16, 
+        forward_expansion=4, 
+        dropout=0.1, 
+        max_len=20
+    )
+
+    r = m(torch.randn(3, 224, 224))
+    print(r)
+    l = m.train_forward(torch.rand(10, 768), torch.randint(1, 50000, (10, 20)))
+    print(l)
