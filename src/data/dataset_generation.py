@@ -35,17 +35,20 @@ if __name__ == '__main__':
     results = []
     loop = tqdm(ds, total=len(ds), position=0, leave=True)
     for img_name, cap in loop:
-        img = Image.open(os.path.join(DATA_PATH, 'raw', 'Images', img_name))
+        try:
+            img = Image.open(os.path.join(DATA_PATH, 'raw', 'Images', img_name))
 
-        with torch.no_grad():
-            img_prep = preprocessor(images=img, return_tensors='pt').to(device)
-            
-            img_features = model(**img_prep)
-            img_features = img_features.pooler_output
-            img_features = img_features.squeeze()
-            img_features = img_features.numpy()
+            with torch.no_grad():
+                img_prep = preprocessor(images=img, return_tensors='pt').to(device)
+                
+                img_features = model(**img_prep)
+                img_features = img_features.pooler_output
+                img_features = img_features.squeeze()
+                img_features = img_features.numpy()
 
-        results.append((img_name, img_features, cap))
+            results.append((img_name, img_features, cap))
+        except:
+            print(f'Lack of image {img_name}')
 
     # save data into pickle file
     # img_name, img_features, caption
