@@ -34,12 +34,12 @@ if __name__ == '__main__':
 
     dataset = MiniFlickrDataset(os.path.join('data', 'processed', 'dataset.pkl'))
 
-    train_size = int(config.train_size * len(dataset))
-    val_size = int(config.val_size * len(dataset))
-    test_size = len(dataset) - train_size - val_size
+    config.train_size = int(config.train_size * len(dataset))
+    config.val_size = int(config.val_size * len(dataset))
+    config.test_size = len(dataset) - config.train_size - config.val_size
 
-    train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
-    
+    train_dataset, val_dataset, test_dataset = random_split(dataset, [config.train_size, config.val_size, config.test_size])
+
     train_loader = get_loader(
         train_dataset, 
         bs_exp=config.batch_size_exp, 
@@ -66,7 +66,6 @@ if __name__ == '__main__':
     wandb.init(project='clipXgpt2 captioner', config=config.__dict__)
     wandb.watch(model, log='all')
     for epoch in range(config.epochs):
-
         train_loss = train_epoch(model, scaler, optimizer, train_loader, epoch, device=device)
         valid_loss = valid_epoch(model, scaler, valid_loader, device=device)
 
