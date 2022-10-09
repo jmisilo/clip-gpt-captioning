@@ -4,25 +4,22 @@ import torch
 import random
 import numpy as np
 import torch.optim as optim
-from tqdm import tqdm
 from model.model import Net
-from model.train_epoch import train_epoch
+from model.loops import train_epoch, valid_epoch
 from utils.config import Config
 from data.dataset import MiniFlickrDataset, get_loader
 from utils.lr_warmup import LRWarmup
+from torch.utils.data import random_split
 
 if __name__ == '__main__':
-    # set seed
-    SEED = 100
-
-    random.seed(SEED)
-    np.random.seed(SEED)
-    torch.manual_seed(SEED)
-    torch.cuda.manual_seed(SEED)
-    torch.backends.cudnn.deterministic = True
-
     config = Config()
-    dataset = MiniFlickrDataset(os.path.join('data', 'processed', 'dataset.pkl'))
+
+    # set seed
+    random.seed(config.seed)
+    np.random.seed(config.seed)
+    torch.manual_seed(config.seed)
+    torch.cuda.manual_seed(config.seed)
+    torch.backends.cudnn.deterministic = True
 
     is_cuda = torch.cuda.is_available()
     device = 'cuda' if is_cuda else 'cpu'
@@ -35,10 +32,26 @@ if __name__ == '__main__':
         max_len=config.max_len
     )
 
-    loader = get_loader(
-        dataset, 
+    dataset = MiniFlickrDataset(os.path.join('data', 'processed', 'dataset.pkl'))
+
+    train_size = int(config.train_size * len(dataset))
+    val_size = int(config.val_size * len(dataset))
+    test_size = len(dataset) - train_size - val_size
+
+    train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
+    
+    train_loader = get_loader(
+        train_dataset, 
         bs_exp=config.batch_size_exp, 
         shuffle=True, 
+        num_workers=config.num_workers if is_cuda else 0,
+        pin_memory=is_cuda
+    )
+
+    valid_loader = get_loader(
+        val_dataset, 
+        bs_exp=config.batch_size_exp, 
+        shuffle=False, 
         num_workers=config.num_workers if is_cuda else 0,
         pin_memory=is_cuda
     )
@@ -50,15 +63,17 @@ if __name__ == '__main__':
     scaler = torch.cuda.amp.GradScaler()
     
     # build train model process with experiment tracking from wandb
-    # wandb.init(project='clipXgpt2 captioner', config=config)
+    wandb.init(project='clipXgpt2 captioner', config=config.__dict__)
+    wandb.watch(model, log='all')
     for epoch in range(config.epochs):
 
-        train_loss = train_epoch(model, scaler, optimizer, loader, epoch, device=device)
+        train_loss = train_epoch(model, scaler, optimizer, train_loader, epoch, device=device)
+        valid_loss = valid_epoch(model, scaler, valid_loader, device=device)
 
         scheduler.step()
-        
-        if epoch: break
 
         # log loss to wandb
-
-        # wandb.log({'loss': total_loss / len(loader)})
+        wandb.log({
+            'train_loss': train_loss,
+            'valid_loss': valid_loss
+        })

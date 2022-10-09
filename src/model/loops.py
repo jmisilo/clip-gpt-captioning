@@ -10,11 +10,8 @@ def train_epoch(model, scaler, optimizer, loader, epoch, device='cpu'):
 
         img_emb, cap, att_mask = img_emb.to(device), cap.to(device), att_mask.to(device)
 
-        x, x_mask = cap[:, :-1], att_mask[:, :-1] 
-        y = cap[:, 1:]
-
         with torch.cuda.amp.autocast():
-            loss = model.train_forward(img_emb=img_emb, trg_cap=x, att_mask=x_mask)
+            loss = model.train_forward(img_emb=img_emb, trg_cap=cap, att_mask=att_mask)
         
         scaler.scale(loss).backward()
         scaler.unscale_(optimizer)
@@ -32,6 +29,28 @@ def train_epoch(model, scaler, optimizer, loader, epoch, device='cpu'):
         loop.refresh()
 
         if batch_idx == 10: break
+
+    return {
+        'loss': total_loss / (batch_idx + 1)
+    }
+
+def valid_epoch(model, loader, device='cpu'):
+    total_loss = 0
+
+    loop = tqdm(loader, total=len(loader))
+    loop.set_description(f'Validation Loss: ---')
+    for batch_idx, (img_emb, cap, att_mask) in enumerate(loop):
+        img_emb, cap, att_mask = img_emb.to(device), cap.to(device), att_mask.to(device)
+
+        with torch.no_grad():
+            with torch.cuda.amp.autocast():
+
+                loss = model.valid_forward(img_emb=img_emb, trg_cap=cap, att_mask=att_mask)
+
+                total_loss += loss.item()
+                
+                loop.set_description(f'Validation Loss: {total_loss / (batch_idx + 1):.3f}')
+                loop.refresh()
 
     return {
         'loss': total_loss / (batch_idx + 1)

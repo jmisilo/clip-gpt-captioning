@@ -155,7 +155,7 @@ class Net(nn.Module):
         self.mp.train()
         self.td.train()
 
-        x = trg_cap[:, :-1]
+        x, x_mask = trg_cap[:, :-1], att_mask[:, :-1]
         y = trg_cap[:, 1:]
 
         # img_emb - (N, embed_size)
@@ -177,7 +177,7 @@ class Net(nn.Module):
         x += pos_emb
 
         # N, len, vocab_size
-        res = self.td(x, attention_mask=att_mask)
+        res = self.td(x, attention_mask=x_mask)
         res = torch.softmax(res, dim=2)
 
         loss = self.criterion(res[:, 1:, :].reshape(-1, res.shape[-1]), y.reshape(-1))
