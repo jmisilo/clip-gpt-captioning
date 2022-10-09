@@ -67,7 +67,7 @@ if __name__ == '__main__':
     wandb.watch(model, log='all')
     for epoch in range(config.epochs):
         train_loss = train_epoch(model, scaler, optimizer, train_loader, epoch, device=device)
-        valid_loss = valid_epoch(model, scaler, valid_loader, device=device)
+        valid_loss = valid_epoch(model, valid_loader, device=device)
 
         scheduler.step()
 
@@ -76,3 +76,16 @@ if __name__ == '__main__':
             'train_loss': train_loss,
             'valid_loss': valid_loss
         })
+
+        torch.save(
+            {
+                'epoch': epoch,
+                'train_loss': train_loss,
+                'valid_loss': valid_loss,
+                'model1_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'scaler_state_dict': scaler.state_dict(),
+            }, 
+            os.path.join('weights', f'epoch_{epoch}.pt')
+        )

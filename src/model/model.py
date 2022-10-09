@@ -106,10 +106,6 @@ class Net(nn.Module):
     def forward(self, img):
         # only one image at a time
 
-        self.ie.eval()
-        self.mp.eval()
-        self.td.eval()
-
         with torch.no_grad():
             img_embedded = self.ie(img)
 
@@ -152,8 +148,6 @@ class Net(nn.Module):
     def train_forward(self, img_emb, trg_cap, att_mask):
         # method should get embedded by CLIP images and trg_text without last token.
         # dataset should contain image, embedded image, text
-        self.mp.train()
-        self.td.train()
 
         x, x_mask = trg_cap[:, :-1], att_mask[:, :-1]
         y = trg_cap[:, 1:]
