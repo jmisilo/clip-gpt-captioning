@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from transformers import CLIPModel, CLIPProcessor, GPT2Tokenizer, GPT2LMHeadModel
+from transformers import CLIPModel, CLIPProcessor, GPT2LMHeadModel, GPT2Tokenizer
 
 class ImageEncoder(nn.Module):
     def __init__(self, device='cpu'):
@@ -64,25 +64,33 @@ class TextDecoder(nn.Module):
         super(TextDecoder, self).__init__()
         
         self.device = device
-
-        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2-xl')
-        self.tokenizer.pad_token = self.tokenizer.eos_token
         
-        self.model = GPT2LMHeadModel.from_pretrained('gpt2').to(self.device)
+        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        self.tokenizer.pad_token = self.tokenizer.eos_token
 
-    def forward(self, embedding):
-        text_features = self.model(inputs_embeds=embedding)
+        self.model = GPT2LMHeadModel.from_pretrained('gpt2').to(self.device)
+        self.vocab_size = self.model.config.vocab_size
+
+    def forward(self, embedding, attention_mask=None):
+        text_features = self.model(inputs_embeds=embedding, attention_mask=None)
         
         return text_features.logits
 
 class Net(nn.Module):
     def __init__(self, num_layers, n_heads, forward_expansion, dropout, max_len, device='cpu'):
+        '''
+            num_layers: number of layers in the TransformerEncoder
+            n_heads: number of heads in the MultiHeadAttention
+            forward_expansion: expansion factor for the feedforward layer
+            dropout: dropout probability
+            max_len: maximum length of the generated text
+        '''
         super(Net, self).__init__()
 
-        self.ie = ImageEncoder()
+        self.ie = ImageEncoder(device=device)
         self.mp = Mapping(num_layers=num_layers, embed_size=self.ie.model.config.hidden_size, n_heads=n_heads, forward_expansion=forward_expansion, dropout=dropout, device=device)
-        self.td = TextDecoder()
-
+        self.td = TextDecoder(device=device)
+        
         assert self.ie.model.config.hidden_size == self.td.model.config.n_embd, "Embedding size of models mismatch"
 
         self.max_len = max_len
@@ -141,15 +149,14 @@ class Net(nn.Module):
 
             return tokens
 
-    def train_forward(self, img_emb, trg_capt):
+    def train_forward(self, img_emb, trg_cap, att_mask):
         # method should get embedded by CLIP images and trg_text without last token.
         # dataset should contain image, embedded image, text
-
         self.mp.train()
         self.td.train()
 
-        x = trg_capt[:, :-1]
-        y = trg_capt[:, 1:]
+        x = trg_cap[:, :-1]
+        y = trg_cap[:, 1:]
 
         # img_emb - (N, embed_size)
         # trg_capt - (N, len)
@@ -159,7 +166,7 @@ class Net(nn.Module):
         img_mapped = img_mapped.unsqueeze(1)
 
         # embed all texts and con cat with map sos
-        text_emb = self.td.model.transformer.wte(trg_capt[:, :-1])
+        text_emb = self.td.model.transformer.wte(x)
 
         # N, len, embed_size
         x = torch.concat([img_mapped, text_emb], dim=1)
@@ -170,7 +177,7 @@ class Net(nn.Module):
         x += pos_emb
 
         # N, len, vocab_size
-        res = self.td(x)
+        res = self.td(x, attention_mask=att_mask)
         res = torch.softmax(res, dim=2)
 
         loss = self.criterion(res[:, 1:, :].reshape(-1, res.shape[-1]), y.reshape(-1))

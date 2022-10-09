@@ -46,7 +46,9 @@ if __name__ == '__main__':
                 img_features = img_features.squeeze()
                 img_features = img_features.numpy()
 
-            results.append((img_name, img_features, cap))
+            for c in cap:
+                results.append((img_name, img_features, c))
+                
         except:
             print(f'Lack of image {img_name}')
 
