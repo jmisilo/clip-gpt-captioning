@@ -29,7 +29,8 @@ if __name__ == '__main__':
         n_heads=config.n_heads, 
         forward_expansion=config.forward_expansion, 
         dropout=config.dropout, 
-        max_len=config.max_len
+        max_len=config.max_len,
+        device=device
     )
 
     dataset = MiniFlickrDataset(os.path.join('data', 'processed', 'dataset.pkl'))
@@ -77,15 +78,19 @@ if __name__ == '__main__':
             'valid_loss': valid_loss
         })
 
-        torch.save(
-            {
-                'epoch': epoch,
-                'train_loss': train_loss,
-                'valid_loss': valid_loss,
-                'model1_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'scheduler_state_dict': scheduler.state_dict(),
-                'scaler_state_dict': scaler.state_dict(),
-            }, 
-            os.path.join('weights', f'epoch_{epoch}.pt')
-        )
+        if not os.path.exists(config.weights_dir):
+            os.makedirs(config.weights_dir)
+
+        if (epoch + 1) % 4: 
+            torch.save(
+                {
+                    'epoch': epoch,
+                    'train_loss': train_loss,
+                    'valid_loss': valid_loss,
+                    'model1_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'scheduler_state_dict': scheduler.state_dict(),
+                    'scaler_state_dict': scaler.state_dict(),
+                }, 
+                os.path.join(config.weights_dir, f'epoch_{epoch}.pt')
+            )
