@@ -4,3 +4,4 @@ __pycache__/
 .vscode/
 /weights/
 /wandb/
+test_generation.ipynb

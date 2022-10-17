@@ -75,13 +75,14 @@ if __name__ == '__main__':
         # log loss to wandb
         wandb.log({
             'train_loss': train_loss,
-            'valid_loss': valid_loss
+            'valid_loss': valid_loss,
+            'lr': scheduler.get_last_lr()[0]
         })
 
         if not os.path.exists(config.weights_dir):
             os.makedirs(config.weights_dir)
 
-        if (epoch + 1) % 4: 
+        if (epoch + 1) % 10 == 0: 
             torch.save(
                 {
                     'epoch': epoch,
