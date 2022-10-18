@@ -26,17 +26,20 @@ if __name__ == '__main__':
     model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32').vision_model.to(device)
 
     # Load dataset
-    df = pd.read_csv(os.path.join(DATA_PATH, 'raw', 'captions.csv'))
+    df = pd.read_csv(os.path.join(DATA_PATH, 'raw', 'results.csv'), sep='|')
+    df.columns = [col.strip() for col in df.columns]
+
+    df = df.drop(['comment_number'], axis=1)
 
     # get every 5 element of the df (5 captions per image) and save image name with corresponding captions
-    ds = [(img_name, df[df['image'] == img_name]['caption'].values) for img_name, _ in df[0::5].to_numpy()]
+    ds = [(img_name, df[df['image_name'] == img_name]['comment'].values) for img_name, _ in df[0::5].to_numpy()]
 
     # Based on loaded dataset, create a list of (image name, image embedding, caption) tuples
     results = []
     loop = tqdm(ds, total=len(ds), position=0, leave=True)
     for img_name, cap in loop:
         try:
-            img = Image.open(os.path.join(DATA_PATH, 'raw', 'Images', img_name))
+            img = Image.open(os.path.join(DATA_PATH, 'raw', 'flickr30k_images', img_name))
 
             with torch.no_grad():
                 img_prep = preprocessor(images=img, return_tensors='pt').to(device)
@@ -47,7 +50,7 @@ if __name__ == '__main__':
                 img_features = img_features.numpy()
 
             for c in cap:
-                results.append((img_name, img_features, c))
+                results.append((img_name, img_features, c[1:])) # because of the separator there is a space at the beginning of the caption
                 
         except:
             print(f'Lack of image {img_name}')
