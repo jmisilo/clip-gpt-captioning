@@ -143,7 +143,9 @@ class Net(nn.Module):
                 if last_token == self.td.tokenizer.eos_token_id:
                     break
 
-            return tokens
+            decoded = self.td.tokenizer.decode(tokens)
+            
+            return decoded, tokens
 
     def train_forward(self, img_emb, trg_cap, att_mask):
         # method should get embedded by CLIP images and trg_text without last token.

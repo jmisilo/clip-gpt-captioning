@@ -5,7 +5,7 @@ import random
 import numpy as np
 import torch.optim as optim
 from model.model import Net
-from model.loops import train_epoch, valid_epoch
+from model.loops import train_epoch, valid_epoch, test_step
 from utils.config import Config
 from data.dataset import MiniFlickrDataset, get_loader
 from utils.lr_warmup import LRWarmup
@@ -69,6 +69,7 @@ if __name__ == '__main__':
     for epoch in range(config.epochs):
         train_loss = train_epoch(model, scaler, optimizer, train_loader, epoch, device=device)
         valid_loss = valid_epoch(model, valid_loader, device=device)
+        test_results = test_step(model, test_dataset, os.path.join('data', 'raw', 'flickr30k_images'))
 
         scheduler.step()
 
@@ -76,7 +77,8 @@ if __name__ == '__main__':
         wandb.log({
             'train_loss': train_loss,
             'valid_loss': valid_loss,
-            'lr': scheduler.get_last_lr()[0]
+            'lr': scheduler.get_last_lr()[0],
+            'examples': wandb.Image(test_results)
         })
 
         if not os.path.exists(config.weights_dir):
