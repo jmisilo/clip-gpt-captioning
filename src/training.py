@@ -61,16 +61,6 @@ if __name__ == '__main__':
 
     warmup = LRWarmup(epochs=config.epochs, max_lr=config.lr, k=config.k)
 
-    x = torch.arange(0, 300).tolist()
-    y = [warmup(i) for i in x]
-
-    print(x)
-    print(y)
-
-    import matplotlib.pyplot as plt
-
-    plt.plot(x, y)
-    plt.show()
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, warmup.lr_warmup)
     scaler = torch.cuda.amp.GradScaler()
     
