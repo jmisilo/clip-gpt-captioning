@@ -6,7 +6,7 @@ class LRWarmup():
         self.max_point = int(k * self.epochs)
 
     def __call__(self, epoch):
-        self.lr_warmup(epoch)
+        return self.lr_warmup(epoch)
 
     def lr_warmup(self, epoch):
         a_1 = self.max_lr / self.max_point
