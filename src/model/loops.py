@@ -1,5 +1,10 @@
+import io
+import os
 import torch
+import numpy as np
+from PIL import Image
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 def train_epoch(model, scaler, optimizer, loader, epoch, device='cpu'):
     model.train()
@@ -58,3 +63,32 @@ def valid_epoch(model, loader, device='cpu'):
     return {
         'loss': total_loss / (batch_idx + 1)
     }
+
+def test_step(model, dataset, img_path, num_examples=4):
+    assert num_examples % 2 == 0, 'num_examples must be even'
+
+    model.eval()
+
+    fig, axs = plt.subplots(num_examples // 2, 2, figsize=(20, 12))
+
+    random_idx = np.random.randint(0, len(dataset), size=(num_examples,))
+    for idx, r in enumerate(random_idx):
+        img_name, _, _ = dataset[r]
+
+        img = Image.open(os.path.join(img_path, img_name))
+
+        with torch.no_grad():
+            caption, _ = model(img)
+
+        axs[idx // 2, idx % 2].imshow(img)
+        axs[idx // 2, idx % 2].set_title(caption)
+        axs[idx // 2, idx % 2].axis('off')
+    
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+
+    fig.clear()
+    plt.close(fig)
+
+    return Image.open(buf)

@@ -5,7 +5,7 @@ import random
 import numpy as np
 import torch.optim as optim
 from model.model import Net
-from model.loops import train_epoch, valid_epoch
+from model.loops import train_epoch, valid_epoch, test_step
 from utils.config import Config
 from data.dataset import MiniFlickrDataset, get_loader
 from utils.lr_warmup import LRWarmup
@@ -25,6 +25,7 @@ if __name__ == '__main__':
     device = 'cuda' if is_cuda else 'cpu'
 
     model = Net(
+        ep_len=config.ep_len,
         num_layers=config.num_layers, 
         n_heads=config.n_heads, 
         forward_expansion=config.forward_expansion, 
@@ -60,6 +61,7 @@ if __name__ == '__main__':
     optimizer = optim.Adam(model.parameters(), lr=config.lr)
 
     warmup = LRWarmup(epochs=config.epochs, max_lr=config.lr, k=config.k)
+
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, warmup.lr_warmup)
     scaler = torch.cuda.amp.GradScaler()
     
@@ -69,6 +71,7 @@ if __name__ == '__main__':
     for epoch in range(config.epochs):
         train_loss = train_epoch(model, scaler, optimizer, train_loader, epoch, device=device)
         valid_loss = valid_epoch(model, valid_loader, device=device)
+        test_results = test_step(model, test_dataset, os.path.join('data', 'raw', 'flickr30k_images'))
 
         scheduler.step()
 
@@ -76,13 +79,14 @@ if __name__ == '__main__':
         wandb.log({
             'train_loss': train_loss,
             'valid_loss': valid_loss,
-            'lr': scheduler.get_last_lr()[0]
+            'lr': scheduler.get_last_lr()[0],
+            'examples': wandb.Image(test_results)
         })
 
         if not os.path.exists(config.weights_dir):
             os.makedirs(config.weights_dir)
 
-        if (epoch + 1) % 10 == 0: 
+        if (epoch + 1) % 15 == 0: 
             torch.save(
                 {
                     'epoch': epoch,
