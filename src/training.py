@@ -25,6 +25,7 @@ if __name__ == '__main__':
     device = 'cuda' if is_cuda else 'cpu'
 
     model = Net(
+        ep_len=config.ep_len,
         num_layers=config.num_layers, 
         n_heads=config.n_heads, 
         forward_expansion=config.forward_expansion, 
