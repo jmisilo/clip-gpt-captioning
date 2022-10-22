@@ -1,0 +1,7 @@
+/venv/
+/data/
+__pycache__/
+.vscode/
+/weights/
+/wandb/
+test_generation.ipynb
