@@ -86,7 +86,7 @@ if __name__ == '__main__':
         if not os.path.exists(config.weights_dir):
             os.makedirs(config.weights_dir)
 
-        if (epoch + 1) % 90 == 0: 
+        if (epoch + 1) % 30 == 0: 
             torch.save(
                 {
                     'epoch': epoch,

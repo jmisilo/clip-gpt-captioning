@@ -52,14 +52,14 @@ class Mapping(nn.Module):
 
         self.init_weights()
 
-    def forward(self, img_embedded):
+    def forward(self, img_embedded, train_mode=False):
         x = self.transformer_encoder(img_embedded)
         x = self.mapper(x)
 
         x = x.view(
             *(
                 [-1, self.ep_len, self.embed_size] 
-                if self.training else 
+                if train_mode else 
                 [self.ep_len, self.embed_size]
             )
         ) # for batched input
@@ -104,6 +104,7 @@ class Net(nn.Module):
         '''
         super(Net, self).__init__()
 
+        self.device = device
         self.ep_len = ep_len
 
         self.ie = ImageEncoder(device=device)
@@ -119,7 +120,7 @@ class Net(nn.Module):
         self.freeze_layers()
 
     def freeze_layers(self):
-        for p in *list(self.ie.parameters()), *list(self.td.parameters())[14:-14]: # freeze everything, except 1st and last transformer layer in Decoder
+        for p in [*list(self.ie.parameters()), *list(self.td.parameters())[14:-14]]: # freeze everything, except 1st and last transformer layer in Decoder
             p.requires_grad = False
 
     def forward(self, img):
@@ -131,7 +132,7 @@ class Net(nn.Module):
             # (ep_len, embed_size)
             img_mapped = self.mp(img_embedded)
 
-            sos_emb = self.td.model.transformer.wte(torch.tensor(self.td.tokenizer.bos_token_id))
+            sos_emb = self.td.model.transformer.wte(torch.tensor(self.td.tokenizer.bos_token_id).to(self.device))
 
             # sos_emb shape embed_size -> (1, embed_size)
             sos_emb = sos_emb.unsqueeze(0)
@@ -142,14 +143,14 @@ class Net(nn.Module):
             tokens = []
             for _ in range(self.max_len):
                 if len(tokens):
-                    tok_emb = self.td.model.transformer.wte(torch.tensor(tokens))
+                    tok_emb = self.td.model.transformer.wte(torch.tensor(tokens).to(self.device))
 
                     emb = torch.cat([start_emb, tok_emb], dim=0)
                 else:
                     emb = start_emb
 
                 # add positional enc
-                pos_emb = self.td.model.transformer.wpe(torch.arange(emb.shape[0]).to(self.td.device))
+                pos_emb = self.td.model.transformer.wpe(torch.arange(emb.shape[0]).to(self.device))
 
                 emb += pos_emb
                 pred = self.td(emb)
@@ -174,14 +175,14 @@ class Net(nn.Module):
         x, x_mask = trg_cap[:, :-1], att_mask[:, :-1]
         y = trg_cap[:, 1:]
 
-        img_mapped = self.mp(img_emb)
+        img_mapped = self.mp(img_emb, train_mode=True)
 
         # embed all texts and con cat with map sos
         text_emb = self.td.model.transformer.wte(x)
 
         # N, len, embed_size
         x = torch.concat([img_mapped, text_emb], dim=1)
-        x_mask = torch.concat([torch.ones(x_mask.shape[0], self.ep_len), x_mask], dim=1)
+        x_mask = torch.concat([torch.ones(x_mask.shape[0], self.ep_len).to(self.device), x_mask], dim=1)
 
         pos_emb = self.td.model.transformer.wpe(torch.arange(x.shape[1]).to(self.td.device))
         pos_emb = pos_emb.expand_as(x)
