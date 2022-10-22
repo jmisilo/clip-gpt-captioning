@@ -11,6 +11,7 @@ class Config:
     lr: int = 6e-3
     k: float = 0.33
     batch_size_exp: int = 6
+    ep_len: int = 4
     num_layers: int = 6
     n_heads: int = 16
     forward_expansion: int = 4

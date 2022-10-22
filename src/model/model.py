@@ -21,6 +21,7 @@ class ImageEncoder(nn.Module):
 class Mapping(nn.Module):
     def __init__(
         self, 
+        ep_len,
         num_layers,
         embed_size, 
         n_heads, 
@@ -30,6 +31,9 @@ class Mapping(nn.Module):
     ):
         super(Mapping, self).__init__()
         
+        self.ep_len = ep_len
+        self.embed_size = embed_size
+
         self.device = device
 
         self.transformer_encoder = nn.TransformerEncoder(
@@ -44,10 +48,23 @@ class Mapping(nn.Module):
             num_layers=num_layers
         ).to(self.device)
 
+        self.mapper = nn.Linear(embed_size, ep_len * embed_size).to(self.device)
+
         self.init_weights()
 
     def forward(self, img_embedded):
-        return self.transformer_encoder(img_embedded)
+        x = self.transformer_encoder(img_embedded)
+        x = self.mapper(x)
+
+        x = x.view(
+            *(
+                [-1, self.ep_len, self.embed_size] 
+                if self.training else 
+                [self.ep_len, self.embed_size]
+            )
+        ) # for batched input
+
+        return x
 
     def init_weights(self):
         for m in self.modules():
@@ -72,12 +89,12 @@ class TextDecoder(nn.Module):
         self.vocab_size = self.model.config.vocab_size
 
     def forward(self, embedding, attention_mask=None):
-        text_features = self.model(inputs_embeds=embedding, attention_mask=None)
+        text_features = self.model(inputs_embeds=embedding, attention_mask=attention_mask)
         
         return text_features.logits
 
 class Net(nn.Module):
-    def __init__(self, num_layers, n_heads, forward_expansion, dropout, max_len, device='cpu'):
+    def __init__(self, ep_len, num_layers, n_heads, forward_expansion, dropout, max_len, device='cpu'):
         '''
             num_layers: number of layers in the TransformerEncoder
             n_heads: number of heads in the MultiHeadAttention
@@ -87,8 +104,10 @@ class Net(nn.Module):
         '''
         super(Net, self).__init__()
 
+        self.ep_len = ep_len
+
         self.ie = ImageEncoder(device=device)
-        self.mp = Mapping(num_layers=num_layers, embed_size=self.ie.model.config.hidden_size, n_heads=n_heads, forward_expansion=forward_expansion, dropout=dropout, device=device)
+        self.mp = Mapping(ep_len=self.ep_len, num_layers=num_layers, embed_size=self.ie.model.config.hidden_size, n_heads=n_heads, forward_expansion=forward_expansion, dropout=dropout, device=device)
         self.td = TextDecoder(device=device)
         
         assert self.ie.model.config.hidden_size == self.td.model.config.n_embd, "Embedding size of models mismatch"
@@ -109,14 +128,15 @@ class Net(nn.Module):
         with torch.no_grad():
             img_embedded = self.ie(img)
 
-            # (1, embed_size)
+            # (ep_len, embed_size)
             img_mapped = self.mp(img_embedded)
-            sos_emb = self.td.model.transformer.wte(torch.tensor(self.td.tokenizer.bos_token_id))
-            
-            # sos_emb shape embed_size -> (1, embed_size)
-            sos_emb = sos_emb.expand_as(img_mapped)
 
-            # (2, embed_size)
+            sos_emb = self.td.model.transformer.wte(torch.tensor(self.td.tokenizer.bos_token_id))
+
+            # sos_emb shape embed_size -> (1, embed_size)
+            sos_emb = sos_emb.unsqueeze(0)
+
+            # (ep_len + 1, embed_size)
             start_emb = torch.cat([sos_emb, img_mapped], dim=0)
 
             tokens = []
@@ -143,7 +163,7 @@ class Net(nn.Module):
                 if last_token == self.td.tokenizer.eos_token_id:
                     break
 
-            decoded = self.td.tokenizer.decode(tokens)
+            decoded = self.td.tokenizer.decode(tokens[self.ep_len + 1:])
             
             return decoded, tokens
 
@@ -154,43 +174,50 @@ class Net(nn.Module):
         x, x_mask = trg_cap[:, :-1], att_mask[:, :-1]
         y = trg_cap[:, 1:]
 
-        # img_emb - (N, embed_size)
-        # trg_capt - (N, len)
         img_mapped = self.mp(img_emb)
-
-        # N, 1, embed_size
-        img_mapped = img_mapped.unsqueeze(1)
 
         # embed all texts and con cat with map sos
         text_emb = self.td.model.transformer.wte(x)
 
         # N, len, embed_size
         x = torch.concat([img_mapped, text_emb], dim=1)
+        x_mask = torch.concat([torch.ones(x_mask.shape[0], self.ep_len), x_mask], dim=1)
 
         pos_emb = self.td.model.transformer.wpe(torch.arange(x.shape[1]).to(self.td.device))
         pos_emb = pos_emb.expand_as(x)
 
         x += pos_emb
 
-        # N, len, vocab_size
         res = self.td(x, attention_mask=x_mask)
         res = torch.softmax(res, dim=2)
 
-        loss = self.criterion(res[:, 1:, :].reshape(-1, res.shape[-1]), y.reshape(-1))
+        loss = self.criterion(res[:, self.ep_len:, :].reshape(-1, res.shape[-1]), y.reshape(-1))
         
         return loss
 
 if __name__ == '__main__':
     
     m = Net(
+        ep_len=3,
         num_layers=6,
         n_heads=16, 
         forward_expansion=4, 
         dropout=0.1, 
         max_len=20
     )
-
+    
+    m.eval()
     r = m(torch.randn(3, 224, 224))
     print(r)
-    l = m.train_forward(torch.rand(10, 768), torch.randint(1, 50000, (10, 20)))
+    
+    m.train()
+    N = 10
+    emb = 768
+    length = 20
+
+    l = m.train_forward(
+        torch.rand(N, emb), 
+        torch.randint(1, 50000, (N, length)), 
+        att_mask=torch.concat([torch.ones(N, length - 3), torch.zeros(N, 3)], dim=1)
+    )
     print(l)
