@@ -7,6 +7,7 @@ import torch.optim as optim
 from model.model import Net
 from model.loops import train_epoch, valid_epoch, test_step
 from utils.config import Config
+from utils.load_ckp import load_ckp
 from data.dataset import MiniFlickrDataset, get_loader
 from utils.lr_warmup import LRWarmup
 from torch.utils.data import random_split
@@ -65,10 +66,13 @@ if __name__ == '__main__':
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, warmup.lr_warmup)
     scaler = torch.cuda.amp.GradScaler()
     
+    ckp_path = os.path.join(config.weights_dir, 'epoch_54.pt')
+    start_epoch = load_ckp(ckp_path, model, optimizer, scheduler, scaler, device) if os.path.exists(ckp_path) else 0
+
     # build train model process with experiment tracking from wandb
     wandb.init(project='clipXgpt2 captioner', config=config.__dict__)
     wandb.watch(model, log='all')
-    for epoch in range(config.epochs):
+    for epoch in range(start_epoch, config.epochs):
         train_loss = train_epoch(model, scaler, optimizer, train_loader, epoch, device=device)
         valid_loss = valid_epoch(model, valid_loader, device=device)
         test_results = test_step(model, test_dataset, os.path.join('data', 'raw', 'flickr30k_images'))
@@ -86,7 +90,7 @@ if __name__ == '__main__':
         if not os.path.exists(config.weights_dir):
             os.makedirs(config.weights_dir)
 
-        if (epoch + 1) % 30 == 0: 
+        if (epoch + 1) % 10 == 0: 
             torch.save(
                 {
                     'epoch': epoch,
