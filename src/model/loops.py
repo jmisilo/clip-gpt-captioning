@@ -92,3 +92,23 @@ def test_step(model, dataset, img_path, num_examples=4):
     plt.close(fig)
 
     return Image.open(buf)
+
+def evaluate_dataset(model, dataset, img_path, save_path):
+
+    model.eval()
+
+    loop = tqdm(dataset, total=len(dataset))
+    for img_name, _, _ in loop:
+        img = Image.open(os.path.join(img_path, img_name))
+
+        with torch.no_grad():
+            caption, _ = model(img)
+
+        plt.imshow(img)
+        plt.title(caption)
+        plt.axis('off')
+
+        plt.savefig(os.path.join(save_path, img_name), bbox_inches='tight')
+
+        plt.clf()
+        plt.close()
