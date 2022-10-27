@@ -1,3 +1,7 @@
+'''
+    Script for single prediction on an image. It puts result in the folder.
+'''
+
 import os
 import torch
 import random

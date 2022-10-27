@@ -1,3 +1,7 @@
+'''
+    Script to evaluate the model on the whole test set and save the results in folder.
+'''
+
 import os
 import torch
 import random

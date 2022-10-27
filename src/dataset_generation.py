@@ -1,3 +1,7 @@
+'''
+    Script to generate the actual dataset for the model. It generates pickle file dataset with image name, image embedding and caption for each image in passed dataset.
+'''
+
 import os
 import torch
 import random

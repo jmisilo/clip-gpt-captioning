@@ -1,4 +1,11 @@
+'''
+    Learning rate scheduler with warmup utility.
+'''
+
 class LRWarmup():
+    '''
+        Self-made learning rate scheduler with warmup.
+    '''
     def __init__(self, epochs, max_lr, k):
         assert k < 0.95 and k > 0.05, 'k must be between 0.05 and 0.95'
         self.epochs = epochs

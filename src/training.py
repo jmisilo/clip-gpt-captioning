@@ -1,3 +1,7 @@
+'''
+    Script that contains whole training process.
+'''
+
 import os
 import wandb
 import torch
