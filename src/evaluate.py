@@ -76,4 +76,9 @@ if __name__ == '__main__':
 
     load_ckp(ckp_path, model, device=device)
 
-    evaluate_dataset(model, test_dataset, args.img_path, args.res_path)
+    save_path = os.path.join(args.res_path, args.checkpoint_name[:-3])
+
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+
+    evaluate_dataset(model, test_dataset, args.img_path, save_path)
