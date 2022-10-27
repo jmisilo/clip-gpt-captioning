@@ -3,14 +3,16 @@
 '''
 
 import os
-import torch
-import random
 import pickle
+import random
+
 import numpy as np
 import pandas as pd
 from PIL import Image
-from tqdm import tqdm
+
+import torch
 from transformers import CLIPModel, CLIPProcessor
+from tqdm import tqdm
 
 if __name__ == '__main__':
     # Set constants

@@ -6,9 +6,11 @@
     * get_loader returns DataLoader object.
 '''
 
-import torch
 import pickle
+
 import numpy as np
+
+import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import GPT2Tokenizer
 

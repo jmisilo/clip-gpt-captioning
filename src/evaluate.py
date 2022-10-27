@@ -2,17 +2,20 @@
     Script to evaluate the model on the whole test set and save the results in folder.
 '''
 
-import os
-import torch
-import random
 import argparse
+import os
+import random
+
 import numpy as np
-from model.loops import evaluate_dataset
-from utils.load_ckp import load_ckp
-from utils.config import Config
-from data.dataset import MiniFlickrDataset
-from model.model import Net
+
+import torch
 from torch.utils.data import random_split
+
+from data.dataset import MiniFlickrDataset
+from model.loops import evaluate_dataset
+from model.model import Net
+from utils.config import Config
+from utils.load_ckp import load_ckp
 
 config = Config()
 parser = argparse.ArgumentParser()

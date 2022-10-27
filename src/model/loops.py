@@ -4,11 +4,13 @@
 
 import io
 import os
-import torch
+
+import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
+
+import torch
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 
 def train_epoch(model, scaler, optimizer, loader, epoch, device='cpu'):
     '''
