@@ -18,6 +18,8 @@ The training process was carried out using the [Kaggle](https://www.kaggle.com/)
 
 ![Example2](./examples/3787801.jpg)
 
+![Example3](./examples/7757242158.jpg)
+
 As I said, the goal was to test the Model's ability to recognize the situation. In the next phase of the experiments, I will try to improve the Model process and parameters to achieve better captions with the same dataset.
 
 ### Usage

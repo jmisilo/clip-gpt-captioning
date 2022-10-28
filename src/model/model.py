@@ -197,7 +197,7 @@ class Net(nn.Module):
                 if last_token == self.td.tokenizer.eos_token_id:
                     break
 
-            decoded = self.td.tokenizer.decode(tokens[self.ep_len + 1:])
+            decoded = self.td.tokenizer.decode(tokens)
             
             return decoded, tokens
 
