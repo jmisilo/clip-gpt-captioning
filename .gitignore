@@ -2,6 +2,6 @@
 /data/
 __pycache__/
 .vscode/
-/weights/
+/weights/arch/
 /wandb/
 test_generation.ipynb

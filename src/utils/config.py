@@ -1,13 +1,21 @@
+'''
+    Project's main config.
+'''
+
 from dataclasses import dataclass
 
 # prepare config class with dataclass
 @dataclass
 class Config:
+    '''
+        Project's main config.
+    '''
+
     seed: int = 100
     num_workers: int = 2
     train_size: int = 0.84
     val_size: int = 0.13
-    epochs: int = 1000
+    epochs: int = 200
     lr: int = 6e-3
     k: float = 0.33
     batch_size_exp: int = 6

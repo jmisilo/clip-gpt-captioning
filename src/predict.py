@@ -1,13 +1,20 @@
-import os
-import torch
-import random
+'''
+    Script for single prediction on an image. It puts result in the folder.
+'''
+
 import argparse
-import numpy as np
-from utils.load_ckp import load_ckp
-from utils.config import Config
-from model.model import Net
-from PIL import Image
+import os
+import random
+
 import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
+
+import torch
+
+from model.model import Net
+from utils.config import Config
+from utils.load_ckp import load_ckp
 
 config = Config()
 parser = argparse.ArgumentParser()

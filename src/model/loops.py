@@ -1,12 +1,30 @@
+'''
+    Module contains all loops used in training and testing processes.
+'''
+
 import io
 import os
-import torch
+
+import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
+
+import torch
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 
 def train_epoch(model, scaler, optimizer, loader, epoch, device='cpu'):
+    '''
+        Train model for one epoch.
+
+        Args:
+            model: model to train
+            scaler: scaler for mixed precision training
+            optimizer: optimizer to use
+            loader: DataLoader object
+            epoch: current epoch
+            device: device to use
+    '''
+
     model.train()
 
     total_loss = 0
@@ -40,6 +58,15 @@ def train_epoch(model, scaler, optimizer, loader, epoch, device='cpu'):
     }
 
 def valid_epoch(model, loader, device='cpu'):
+    '''
+        Validate model for one epoch.
+
+        Args:   
+            model: model to validate
+            loader: DataLoader object
+            device: device to use    
+    '''
+
     model.eval()
 
     total_loss = 0
@@ -65,6 +92,16 @@ def valid_epoch(model, loader, device='cpu'):
     }
 
 def test_step(model, dataset, img_path, num_examples=4):
+    '''
+        Test model on dataset.
+    
+        Args:
+            model: model to test
+            dataset: dataset to test on
+            img_path: path to images
+            num_examples: number of examples to show
+    '''
+
     assert num_examples % 2 == 0, 'num_examples must be even'
 
     model.eval()
@@ -94,7 +131,15 @@ def test_step(model, dataset, img_path, num_examples=4):
     return Image.open(buf)
 
 def evaluate_dataset(model, dataset, img_path, save_path):
-
+    '''
+        Evaluate model on dataset.
+    
+        Args:
+            model: model to evaluate
+            dataset: dataset to evaluate on
+            img_path: path to images
+            save_path: path to save results
+    '''
     model.eval()
 
     loop = tqdm(dataset, total=len(dataset))
