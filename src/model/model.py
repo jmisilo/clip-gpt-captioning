@@ -1,8 +1,16 @@
+'''
+    Module contains final Model and all pieces of it.
+'''
+
 import torch
 import torch.nn as nn
 from transformers import CLIPModel, CLIPProcessor, GPT2LMHeadModel, GPT2Tokenizer
 
 class ImageEncoder(nn.Module):
+    '''
+        Encodes image and returns it's embedding.
+    '''
+
     def __init__(self, device='cpu'):
         super(ImageEncoder, self).__init__()
         
@@ -19,6 +27,10 @@ class ImageEncoder(nn.Module):
         return image_features.pooler_output
 
 class Mapping(nn.Module):
+    '''
+        Maps image embedding to GPT-2 embedding.
+    '''
+    
     def __init__(
         self, 
         ep_len,
@@ -77,6 +89,10 @@ class Mapping(nn.Module):
                 nn.init.zeros_(m.bias)
 
 class TextDecoder(nn.Module):
+    '''
+        Processes embedding into caption.
+    '''
+
     def __init__(self, device='cpu'):
         super(TextDecoder, self).__init__()
         
@@ -94,13 +110,20 @@ class TextDecoder(nn.Module):
         return text_features.logits
 
 class Net(nn.Module):
+    '''
+        Final Model class. Puts all pieces together and generates caption based on image.
+    '''
+    
     def __init__(self, ep_len, num_layers, n_heads, forward_expansion, dropout, max_len, device='cpu'):
         '''
-            num_layers: number of layers in the TransformerEncoder
-            n_heads: number of heads in the MultiHeadAttention
-            forward_expansion: expansion factor for the feedforward layer
-            dropout: dropout probability
-            max_len: maximum length of the generated text
+            Model constructor.
+
+            Args:
+                num_layers: number of layers in the TransformerEncoder
+                n_heads: number of heads in the MultiHeadAttention
+                forward_expansion: expansion factor for the feedforward layer
+                dropout: dropout probability
+                max_len: maximum length of the generated text
         '''
         super(Net, self).__init__()
 
@@ -124,6 +147,16 @@ class Net(nn.Module):
             p.requires_grad = False
 
     def forward(self, img):
+        '''
+            Caption generation for a single image.
+
+            Args:
+                img: image to generate caption for [PIL.Image]
+
+            Returns:
+                caption: generated caption [str]
+                tokens: generated tokens [torch.Tensor]
+        '''
         # only one image at a time
 
         with torch.no_grad():

@@ -1,17 +1,24 @@
+'''
+    Script that contains whole training process.
+'''
+
+import argparse
 import os
+import random
+
+import numpy as np
+
 import wandb
 import torch
-import random
-import argparse
-import numpy as np
 import torch.optim as optim
+from torch.utils.data import random_split
+
+from data.dataset import MiniFlickrDataset, get_loader
 from model.model import Net
 from model.loops import train_epoch, valid_epoch, test_step
 from utils.config import Config
 from utils.load_ckp import load_ckp
-from data.dataset import MiniFlickrDataset, get_loader
 from utils.lr_warmup import LRWarmup
-from torch.utils.data import random_split
 
 config = Config()
 parser = argparse.ArgumentParser()
