@@ -5,3 +5,4 @@ __pycache__/
 /weights/arch/
 /wandb/
 test_generation.ipynb
+TEST
