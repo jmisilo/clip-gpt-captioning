@@ -15,7 +15,7 @@ from data.dataset import MiniFlickrDataset
 from model.loops import evaluate_dataset
 from model.model import Net
 from utils.config import Config
-from utils.load_ckp import load_ckp
+from utils.load_ckp import download_weights
 
 config = Config()
 parser = argparse.ArgumentParser()
@@ -48,9 +48,7 @@ args = parser.parse_args()
 
 ckp_path = os.path.join(config.weights_dir, args.checkpoint_name)
 
-assert os.path.isfile(ckp_path), 'Checkpoint does not exist'
 assert os.path.exists(args.img_path), 'Path to the test image folder does not exist'
-assert os.path.exists(args.res_path), 'Path to the results folder does not exist'
 
 # set seed
 random.seed(config.seed)
@@ -81,7 +79,14 @@ if __name__ == '__main__':
 
     _, _, test_dataset = random_split(dataset, [config.train_size, config.val_size, config.test_size])
 
-    load_ckp(ckp_path, model, device=device)
+    if not os.path.exists(config.weights_dir):
+        os.makedirs(config.weights_dir)
+
+    if not os.path.isfile(ckp_path):
+        download_weights(ckp_path)
+
+    checkpoint = torch.load(ckp_path, map_location=device)
+    model.load_state_dict(checkpoint)    
 
     save_path = os.path.join(args.res_path, args.checkpoint_name[:-3])
 

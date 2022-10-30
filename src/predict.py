@@ -13,8 +13,8 @@ from PIL import Image
 import torch
 
 from model.model import Net
+from utils.load_ckp import download_weights
 from utils.config import Config
-from utils.load_ckp import load_ckp
 
 config = Config()
 parser = argparse.ArgumentParser()
@@ -59,7 +59,6 @@ if __name__ == '__main__':
     ckp_path = os.path.join(config.weights_dir, args.checkpoint_name)
 
     assert os.path.isfile(args.img_path), 'Image does not exist'
-    assert os.path.isfile(ckp_path), 'Checkpoint does not exist'
     
     if not os.path.exists(args.res_path):
         os.makedirs(args.res_path)
@@ -75,8 +74,15 @@ if __name__ == '__main__':
         max_len=config.max_len,
         device=device
     )
+        
+    if not os.path.exists(config.weights_dir):
+        os.makedirs(config.weights_dir)
 
-    load_ckp(ckp_path, model, device=device)
+    if not os.path.isfile(ckp_path):
+        download_weights(ckp_path)
+        
+    checkpoint = torch.load(ckp_path, map_location=device)
+    model.load_state_dict(checkpoint)    
 
     model.eval()
 
