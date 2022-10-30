@@ -44,6 +44,14 @@ parser.add_argument(
     help='Path to the results folder'
 )
 
+parser.add_argument(
+    '-T', 
+    '--temperature',
+    type=float,
+    default=1.0,
+    help='Temperature for sampling'
+)
+
 args = parser.parse_args()
 
 ckp_path = os.path.join(config.weights_dir, args.checkpoint_name)
@@ -93,4 +101,4 @@ if __name__ == '__main__':
     if not os.path.exists(save_path):
         os.mkdir(save_path)
 
-    evaluate_dataset(model, test_dataset, args.img_path, save_path)
+    evaluate_dataset(model, test_dataset, args.img_path, save_path, args.temperature)
