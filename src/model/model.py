@@ -146,7 +146,7 @@ class Net(nn.Module):
         for p in [*list(self.ie.parameters()), *list(self.td.parameters())[14:-14]]: # freeze everything, except 1st and last transformer layer in Decoder
             p.requires_grad = False
 
-    def forward(self, img):
+    def forward(self, img, temperature=1.0):
         '''
             Caption generation for a single image.
 
@@ -187,6 +187,8 @@ class Net(nn.Module):
 
                 emb += pos_emb
                 pred = self.td(emb)
+
+                pred = torch.softmax(pred / temperature, dim=-1)
 
                 _, pred = torch.max(pred, dim=1)
 

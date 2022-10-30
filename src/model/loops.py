@@ -130,7 +130,7 @@ def test_step(model, dataset, img_path, num_examples=4):
 
     return Image.open(buf)
 
-def evaluate_dataset(model, dataset, img_path, save_path):
+def evaluate_dataset(model, dataset, img_path, save_path, temperature=1.0):
     '''
         Evaluate model on dataset.
     
@@ -147,7 +147,7 @@ def evaluate_dataset(model, dataset, img_path, save_path):
         img = Image.open(os.path.join(img_path, img_name))
 
         with torch.no_grad():
-            caption, _ = model(img)
+            caption, _ = model(img, temperature)
 
         plt.imshow(img)
         plt.title(caption)
