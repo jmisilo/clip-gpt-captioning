@@ -157,7 +157,10 @@ class Net(nn.Module):
                 caption: generated caption [str]
                 tokens: generated tokens [torch.Tensor]
         '''
-        # only one image at a time
+
+        if temperature <= 0.0:
+            temperature = 1.0
+            print('Temperature must be positive. Setting it to 1.0')
 
         with torch.no_grad():
             img_embedded = self.ie(img)
