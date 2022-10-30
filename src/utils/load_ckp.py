@@ -1,7 +1,8 @@
 '''
-    Utility function to load checkpoint from coresponding file.
+    Utility functions for loading weights.
 '''
 
+import gdown
 import torch
 
 def load_ckp(checkpoint_fpath, model, optimizer=None, scheduler=None, scaler=None, device='cpu'):
@@ -22,3 +23,10 @@ def load_ckp(checkpoint_fpath, model, optimizer=None, scheduler=None, scaler=Non
         scaler.load_state_dict(checkpoint['scaler_state_dict'])
 
     return checkpoint['epoch']
+
+def download_weights(checkpoint_fpath):
+    '''
+        Downloads weights from Google Drive.
+    '''
+    
+    gdown.download('https://drive.google.com/uc?id=1lEufQVOETFEIhPdFDYaez31uroq_5Lby', checkpoint_fpath, quiet=False)
