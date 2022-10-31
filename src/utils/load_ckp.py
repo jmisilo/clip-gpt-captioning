@@ -22,7 +22,7 @@ def load_ckp(checkpoint_fpath, model, optimizer=None, scheduler=None, scaler=Non
     if scaler is not None:
         scaler.load_state_dict(checkpoint['scaler_state_dict'])
 
-    return checkpoint['epoch']
+    return checkpoint['epoch'], checkpoint['tloss'], checkpoint['vloss']
 
 def download_weights(checkpoint_fpath):
     '''
