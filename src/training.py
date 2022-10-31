@@ -87,7 +87,11 @@ if __name__ == '__main__':
     scaler = torch.cuda.amp.GradScaler()
     
     ckp_path = os.path.join(config.weights_dir, args.checkpoint_name)
-    start_epoch = load_ckp(ckp_path, model, optimizer, scheduler, scaler, device) if os.path.isfile(ckp_path) else 0
+    start_epoch, total_train_loss, total_valid_loss = (
+        load_ckp(ckp_path, model, optimizer, scheduler, scaler, device) 
+        if os.path.isfile(ckp_path) else 
+        0, [], []
+    )
 
     # build train model process with experiment tracking from wandb
     wandb.init(project='clipXgpt2 captioner', config=config.__dict__)
@@ -107,6 +111,9 @@ if __name__ == '__main__':
             'examples': wandb.Image(test_results)
         })
 
+        total_train_loss.append(train_loss)
+        total_valid_loss.append(valid_loss)
+
         if not os.path.exists(config.weights_dir):
             os.makedirs(config.weights_dir)
 
@@ -114,12 +121,12 @@ if __name__ == '__main__':
             torch.save(
                 {
                     'epoch': epoch,
-                    'train_loss': train_loss,
-                    'valid_loss': valid_loss,
                     'model1_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'scheduler_state_dict': scheduler.state_dict(),
                     'scaler_state_dict': scaler.state_dict(),
+                    'tloss': total_train_loss,
+                    'vloss': total_valid_loss
                 }, 
                 os.path.join(config.weights_dir, f'epoch_{epoch}.pt')
             )
