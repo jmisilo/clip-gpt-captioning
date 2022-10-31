@@ -121,7 +121,7 @@ if __name__ == '__main__':
             torch.save(
                 {
                     'epoch': epoch,
-                    'model1_state_dict': model.state_dict(),
+                    'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'scheduler_state_dict': scheduler.state_dict(),
                     'scaler_state_dict': scaler.state_dict(),

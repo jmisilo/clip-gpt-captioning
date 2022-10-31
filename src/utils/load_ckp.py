@@ -12,7 +12,7 @@ def load_ckp(checkpoint_fpath, model, optimizer=None, scheduler=None, scaler=Non
 
     checkpoint = torch.load(checkpoint_fpath, map_location=device)
 
-    model.load_state_dict(checkpoint['model1_state_dict'])
+    model.load_state_dict(checkpoint['model_state_dict'])
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
