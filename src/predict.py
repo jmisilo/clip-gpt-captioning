@@ -43,6 +43,14 @@ parser.add_argument(
     help='Path to the results folder'
 )
 
+parser.add_argument(
+    '-T', 
+    '--temperature',
+    type=float,
+    default=1.0,
+    help='Temperature for sampling'
+)
+
 args = parser.parse_args()
 
 # set seed
@@ -87,7 +95,7 @@ if __name__ == '__main__':
     model.eval()
 
     with torch.no_grad():
-        caption, _ = model(img)
+        caption, _ = model(img, args.temperature)
 
     plt.imshow(img)
     plt.title(caption)

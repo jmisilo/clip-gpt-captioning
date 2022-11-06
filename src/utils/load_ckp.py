@@ -12,7 +12,7 @@ def load_ckp(checkpoint_fpath, model, optimizer=None, scheduler=None, scaler=Non
 
     checkpoint = torch.load(checkpoint_fpath, map_location=device)
 
-    model.load_state_dict(checkpoint['model1_state_dict'])
+    model.load_state_dict(checkpoint['model_state_dict'])
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
@@ -22,11 +22,11 @@ def load_ckp(checkpoint_fpath, model, optimizer=None, scheduler=None, scaler=Non
     if scaler is not None:
         scaler.load_state_dict(checkpoint['scaler_state_dict'])
 
-    return checkpoint['epoch']
+    return checkpoint['epoch'], checkpoint['tloss'], checkpoint['vloss']
 
 def download_weights(checkpoint_fpath):
     '''
         Downloads weights from Google Drive.
     '''
     
-    gdown.download('https://drive.google.com/uc?id=1lEufQVOETFEIhPdFDYaez31uroq_5Lby', checkpoint_fpath, quiet=False)
+    gdown.download('https://drive.google.com/uc?id=10ieSMMJzE9EeiPIF3CMzeT4timiQTjHV', checkpoint_fpath, quiet=False)
