@@ -15,8 +15,8 @@ class Config:
     num_workers: int = 2
     train_size: int = 0.84
     val_size: int = 0.13
-    epochs: int = 200
-    lr: int = 6e-3
+    epochs: int = 150
+    lr: int = 3e-3
     k: float = 0.33
     batch_size_exp: int = 6
     ep_len: int = 4

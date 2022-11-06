@@ -10,17 +10,17 @@ The Model uses prefixes as in the [ClipCap](https://arxiv.org/abs/2111.09734) pa
 
 The Model was trained with a frozen CLIP, a fully trained Mapping Module (6x Transformer Encoder Layers) and with partially frozen GPT-2 (the first and last 14 layers were trained).
 
-The training process was carried out using the [Kaggle](https://www.kaggle.com/) P100 GPU. Training time is about 2 x 11h (106 epochs) with a linearly changing learning rate (from 0 to 0.0001908) and batch size 64. Originally, the Model was supposed to be trained longer - which results in a non-standard LR. *I also tried a longer training session (150 epochs), but overtraining was noticeable.*
+The training process was carried out using the [Kaggle](https://www.kaggle.com/) P100 GPU. Training time - about 3 x 11h (150 epochs) with a linear learning rate warmup (max LR `3e-3`) and batch size 64. 
+
+#### Loss and Learning Rate during training
+
+![LOSSxLR](./examples/loss_lr.jpg)
 
 ### Example results
 
 ![Example1](./examples/23012796.jpg)
-
-![Example2](./examples/3787801.jpg)
-
-![Example3](./examples/7757242158.jpg)
-
-As I said, the goal was to test the Model's ability to recognize the situation. In the next phase of the experiments, I will try to improve the Model process and parameters to achieve better captions with the same dataset.
+![Example2](./examples/36979.jpg)
+![Example3](./examples/89407459.jpg)
 
 ### Usage
 
@@ -36,7 +36,10 @@ Create environment and install requirements:
 
 ```bash
 python -m venv venv
+# for windows
 .\venv\Scripts\activate
+# for linux/mac
+source venv/bin/activate
 
 pip install -r requirements.txt
 ```
