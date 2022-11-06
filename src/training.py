@@ -90,7 +90,7 @@ if __name__ == '__main__':
     start_epoch, total_train_loss, total_valid_loss = (
         load_ckp(ckp_path, model, optimizer, scheduler, scaler, device) 
         if os.path.isfile(ckp_path) else 
-        0, [], []
+        (0, [], [])
     )
 
     # build train model process with experiment tracking from wandb
