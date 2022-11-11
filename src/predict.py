@@ -12,9 +12,8 @@ from PIL import Image
 
 import torch
 
-from model.model import Net
-from utils.load_ckp import download_weights
-from utils.config import Config
+from model import Net
+from utils import Config, download_weights
 
 config = Config()
 parser = argparse.ArgumentParser()
