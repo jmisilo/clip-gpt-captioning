@@ -13,12 +13,9 @@ import torch
 import torch.optim as optim
 from torch.utils.data import random_split
 
-from data.dataset import MiniFlickrDataset, get_loader
-from model.model import Net
-from model.loops import train_epoch, valid_epoch, test_step
-from utils.config import Config
-from utils.load_ckp import load_ckp
-from utils.lr_warmup import LRWarmup
+from data import MiniFlickrDataset, get_loader
+from model import Net, train_epoch, test_step, valid_epoch
+from utils import Config, load_ckp, LRWarmup
 
 config = Config()
 parser = argparse.ArgumentParser()
