@@ -11,11 +11,9 @@ import numpy as np
 import torch
 from torch.utils.data import random_split
 
-from data.dataset import MiniFlickrDataset
-from model.loops import evaluate_dataset
-from model.model import Net
-from utils.config import Config
-from utils.load_ckp import download_weights
+from data import MiniFlickrDataset
+from model import evaluate_dataset, Net 
+from utils import Config, download_weights
 
 config = Config()
 parser = argparse.ArgumentParser()
