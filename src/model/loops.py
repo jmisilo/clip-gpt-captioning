@@ -12,123 +12,182 @@ from PIL import Image
 import torch
 from tqdm import tqdm
 
-def train_epoch(model, scaler, optimizer, loader, epoch, device='cpu'):
-    '''
-        Train model for one epoch.
+class Trainer:
+    def __init__(self, model, optimizer, scaler, scheduler, train_loader, valid_loader, test_dataset, test_path, ckp_path, device):
+        self.model = model
+        self.optimizer = optimizer
+        self.scaler = scaler
+        self.scheduler = scheduler
+        self.train_loader = train_loader
+        self.valid_loader = valid_loader
+        self.test_dataset = test_dataset
+        self.test_path = test_path
+        self.ckp_path = ckp_path
+        self.device = device
 
-        Args:
-            model: model to train
-            scaler: scaler for mixed precision training
-            optimizer: optimizer to use
-            loader: DataLoader object
-            epoch: current epoch
-            device: device to use
-    '''
+        # load checkpoint
+        if os.path.isfile(ckp_path):
+            self._load_ckp(ckp_path, optimizer, scheduler, scaler, device=device)
 
-    model.train()
-
-    total_loss = 0
-
-    loop = tqdm(loader, total=len(loader))
-    loop.set_description(f'Epoch: {epoch} | Loss: ---')
-    for batch_idx, (img_emb, cap, att_mask) in enumerate(loop):
-
-        img_emb, cap, att_mask = img_emb.to(device), cap.to(device), att_mask.to(device)
-
-        with torch.cuda.amp.autocast():
-            loss = model.train_forward(img_emb=img_emb, trg_cap=cap, att_mask=att_mask)
-        
-        scaler.scale(loss).backward()
-        scaler.unscale_(optimizer)
-
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.3)
-
-        scaler.step(optimizer)
-        scaler.update()
-
-        optimizer.zero_grad()
-
-        total_loss += loss.item()
-
-        loop.set_description(f'Epoch: {epoch} | Loss: {total_loss / (batch_idx + 1):.3f}')
-        loop.refresh()
-
-    return {
-        'loss': total_loss / (batch_idx + 1)
-    }
-
-def valid_epoch(model, loader, device='cpu'):
-    '''
-        Validate model for one epoch.
-
-        Args:   
-            model: model to validate
-            loader: DataLoader object
-            device: device to use    
-    '''
-
-    model.eval()
-
-    total_loss = 0
-
-    loop = tqdm(loader, total=len(loader))
-    loop.set_description(f'Validation Loss: ---')
-    for batch_idx, (img_emb, cap, att_mask) in enumerate(loop):
-
-        img_emb, cap, att_mask = img_emb.to(device), cap.to(device), att_mask.to(device)
-
-        with torch.no_grad():
-            with torch.cuda.amp.autocast():
-
-                loss = model.train_forward(img_emb=img_emb, trg_cap=cap, att_mask=att_mask)
-
-                total_loss += loss.item()
+        else:
+            self.cur_lr = self.optimizer.param_groups[0]['lr']
+            self.epoch = 0
+            self.train_loss = []
+            self.valid_loss = []
+            self.test_result = None
                 
-                loop.set_description(f'Validation Loss: {total_loss / (batch_idx + 1):.3f}')
-                loop.refresh()
+    def train_epoch(self):
+        self.model.train()
+        self.epoch += 1
 
-    return {
-        'loss': total_loss / (batch_idx + 1)
-    }
+        total_loss = 0
 
-def test_step(model, dataset, img_path, num_examples=4):
-    '''
-        Test model on dataset.
+        loop = tqdm(self.train_loader, total=len(self.train_loader))
+        loop.set_description(f'Epoch: {self.epoch} | Loss: ---')
+        for batch_idx, (img_emb, cap, att_mask) in enumerate(loop):
+
+            img_emb, cap, att_mask = img_emb.to(self.device), cap.to(self.device), att_mask.to(self.device)
+
+            with torch.cuda.amp.autocast():
+                loss = self.model.train_forward(img_emb=img_emb, trg_cap=cap, att_mask=att_mask)
+            
+            self.scaler.scale(loss).backward()
+            self.scaler.unscale_(self.optimizer)
+
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.3)
+
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+
+            self.optimizer.zero_grad()
+
+            total_loss += loss.item()
+
+            loop.set_description(f'Epoch: {self.epoch} | Loss: {total_loss / (batch_idx + 1):.3f}')
+            loop.refresh()
+
+        self.cur_lr = self.optimizer.param_groups[0]['lr']
+        self.train_loss.append(total_loss / (batch_idx + 1))
+
+        self.scheduler.step()
+
+        return True
     
-        Args:
-            model: model to test
-            dataset: dataset to test on
-            img_path: path to images
-            num_examples: number of examples to show
-    '''
+    def valid_epoch(self):
+        self.model.eval()
 
-    assert num_examples % 2 == 0, 'num_examples must be even'
+        total_loss = 0
 
-    model.eval()
+        loop = tqdm(self.loader, total=len(self.loader))
+        loop.set_description(f'Validation Loss: ---')
+        for batch_idx, (img_emb, cap, att_mask) in enumerate(loop):
 
-    fig, axs = plt.subplots(num_examples // 2, 2, figsize=(20, 12))
+            img_emb, cap, att_mask = img_emb.to(self.device), cap.to(self.device), att_mask.to(self.device)
 
-    random_idx = np.random.randint(0, len(dataset), size=(num_examples,))
-    for idx, r in enumerate(random_idx):
-        img_name, _, _ = dataset[r]
+            with torch.no_grad():
+                with torch.cuda.amp.autocast():
 
-        img = Image.open(os.path.join(img_path, img_name))
+                    loss = self.model.train_forward(img_emb=img_emb, trg_cap=cap, att_mask=att_mask)
 
-        with torch.no_grad():
-            caption, _ = model(img)
+                    total_loss += loss.item()
+                    
+                    loop.set_description(f'Validation Loss: {total_loss / (batch_idx + 1):.3f}')
+                    loop.refresh()
 
-        axs[idx // 2, idx % 2].imshow(img)
-        axs[idx // 2, idx % 2].set_title(caption)
-        axs[idx // 2, idx % 2].axis('off')
-    
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png')
-    buf.seek(0)
+        self.valid_loss.append(total_loss / (batch_idx + 1))
 
-    fig.clear()
-    plt.close(fig)
+        return True
 
-    return Image.open(buf)
+    def test_step(self, num_examples=4):
+        assert num_examples % 2 == 0, 'num_examples must be even'
+
+        self.model.eval()
+
+        fig, axs = plt.subplots(num_examples // 2, 2, figsize=(20, 12))
+
+        random_idx = np.random.randint(0, len(self.dataset), size=(num_examples,))
+        for idx, r in enumerate(random_idx):
+            img_name, _, _ = self.dataset[r]
+
+            img = Image.open(os.path.join(self.test_path, img_name))
+
+            with torch.no_grad():
+                caption, _ = self.model(img)
+
+            axs[idx // 2, idx % 2].imshow(img)
+            axs[idx // 2, idx % 2].set_title(caption)
+            axs[idx // 2, idx % 2].axis('off')
+        
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+
+        fig.clear()
+        plt.close(fig)
+
+        self.test_result = Image.open(buf)
+
+        return True
+
+    def get_training_data(self):
+        return {
+            'train_loss': self.train_loss, 
+            'valid_loss': self.valid_loss, 
+            'lr': self.cur_lr, 
+            'examples': self.test_result    
+        }
+
+    def save_ckp(self, ckp_path):
+        torch.save(
+            {
+                'epoch': self.epoch,
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                'scheduler_state_dict': self.scheduler.state_dict(),
+                'scaler_state_dict': self.scaler.state_dict(),
+                'tloss': self.train_loss,
+                'vloss': self.valid_loss
+            }, 
+            ckp_path
+        )   
+
+        return True
+
+    def _load_ckp(
+        self, 
+        checkpoint_fpath,
+        optimizer=False, 
+        scheduler=False, 
+        scaler=False, 
+        epoch=False, 
+        train_loss=False, 
+        valid_loss=False, 
+        device='cpu'
+    ):
+        '''
+            Loads entire checkpoint from file.
+        '''
+
+        checkpoint = torch.load(checkpoint_fpath, map_location=device)
+
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        if optimizer is not None:
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+        if scheduler is not None:
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        
+        if scaler is not None:
+            self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
+
+        if epoch is not None:
+            self.epoch = checkpoint['epoch']
+
+        if train_loss is not None:
+            self.train_loss = checkpoint['train_loss']
+
+        if valid_loss is not None:
+            self.valid_loss = checkpoint['valid_loss']
 
 def evaluate_dataset(model, dataset, img_path, save_path, temperature=1.0):
     '''

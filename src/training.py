@@ -13,9 +13,14 @@ import torch
 import torch.optim as optim
 from torch.utils.data import random_split
 
+import torch.multiprocessing as mp
+from torch.utils.data.distributed import DistributedSampler
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 from data import MiniFlickrDataset, get_loader
-from model import Net, train_epoch, test_step, valid_epoch
-from utils import Config, load_ckp, LRWarmup
+# from model import ddp_cleanup, ddp_setup, Net, Trainer
+from model import Net, Trainer
+from utils import Config, LRWarmup
 
 config = Config()
 parser = argparse.ArgumentParser()
@@ -37,11 +42,9 @@ torch.manual_seed(config.seed)
 torch.cuda.manual_seed(config.seed)
 torch.backends.cudnn.deterministic = True
 
-is_cuda = torch.cuda.is_available()
-device = 'cuda' if is_cuda else 'cpu'
-
-if __name__ == '__main__':
-
+def main(config, ckp_name):
+    is_cuda = torch.cuda.is_available()
+    device = 'cuda' if is_cuda else 'cpu'
     model = Net(
         ep_len=config.ep_len,
         num_layers=config.num_layers, 
@@ -81,49 +84,46 @@ if __name__ == '__main__':
     warmup = LRWarmup(epochs=config.epochs, max_lr=config.lr, k=config.k)
 
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, warmup.lr_warmup)
-    scaler = torch.cuda.amp.GradScaler()
-    
-    ckp_path = os.path.join(config.weights_dir, args.checkpoint_name)
-    start_epoch, total_train_loss, total_valid_loss = (
-        load_ckp(ckp_path, model, optimizer, scheduler, scaler, device) 
-        if os.path.isfile(ckp_path) else 
-        (0, [], [])
+    scaler = torch.cuda.amp.GradScaler()    
+
+    ckp_path = os.path.join(config.weights_dir, ckp_name)
+
+    trainer = Trainer(
+        model=model,
+        optimizer=optimizer,
+        scaler=scaler,
+        scheduler=scheduler,
+        train_loader=train_loader,
+        valid_loader=valid_loader,
+        test_dataset=test_dataset,
+        test_path=os.path.join('data', 'raw', 'flickr30k_images'),
+        ckp_path=ckp_path,
+        device=device
     )
 
     # build train model process with experiment tracking from wandb
     wandb.init(project='clipXgpt2 captioner', config=config.__dict__)
-    wandb.watch(model, log='all')
-    for epoch in range(start_epoch, config.epochs):
-        train_loss = train_epoch(model, scaler, optimizer, train_loader, epoch, device=device)
-        valid_loss = valid_epoch(model, valid_loader, device=device)
-        test_results = test_step(model, test_dataset, os.path.join('data', 'raw', 'flickr30k_images'))
+    wandb.watch(trainer.model, log='all')
+    for epoch in range(trainer.epoch, config.epochs):
+        trainer.train_epoch()
+        trainer.valid_epoch()
+        trainer.test_result()
 
-        scheduler.step()
+        metadata = trainer.get_training_data()
 
         # log loss to wandb
         wandb.log({
-            'train_loss': train_loss,
-            'valid_loss': valid_loss,
-            'lr': scheduler.get_last_lr()[0],
-            'examples': wandb.Image(test_results)
+            'train_loss': metadata['train_loss'],
+            'valid_loss': metadata['valid_loss'],
+            'lr': metadata['lr'],
+            'examples': wandb.Image(metadata['examples'])
         })
-
-        total_train_loss.append(train_loss)
-        total_valid_loss.append(valid_loss)
 
         if not os.path.exists(config.weights_dir):
             os.makedirs(config.weights_dir)
 
         if (epoch + 1) % 10 == 0: 
-            torch.save(
-                {
-                    'epoch': epoch,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'scheduler_state_dict': scheduler.state_dict(),
-                    'scaler_state_dict': scaler.state_dict(),
-                    'tloss': total_train_loss,
-                    'vloss': total_valid_loss
-                }, 
-                os.path.join(config.weights_dir, f'epoch_{epoch}.pt')
-            )
+            trainer.save_ckp(os.path.join(config.weights_dir, f'epoch_{epoch}.pt'))
+
+if __name__ == '__main__':
+    main(config, args.checkpoint_name)

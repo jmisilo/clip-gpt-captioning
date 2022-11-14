@@ -4,7 +4,14 @@
 
 import torch
 import torch.nn as nn
+# from torch.distributed import init_process_group, destroy_process_group
 from transformers import CLIPModel, CLIPProcessor, GPT2LMHeadModel, GPT2Tokenizer
+
+# def ddp_setup(rank, world_size):
+#     init_process_group('nccl', rank=rank, world_size=world_size)
+
+# def ddp_cleanup():
+#     destroy_process_group()
 
 class ImageEncoder(nn.Module):
     '''
