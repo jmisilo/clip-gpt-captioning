@@ -16,8 +16,8 @@ class ImageEncoder(nn.Module):
         
         self.device = device
 
-        self.preprocessor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32')
-        self.model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32').vision_model.to(self.device)
+        self.preprocessor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch14')
+        self.model = CLIPModel.from_pretrained('openai/clip-vit-base-patch14').vision_model.to(self.device)
 
     def forward(self, image):
         # only one image at a time
