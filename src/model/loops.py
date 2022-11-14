@@ -13,7 +13,7 @@ import torch
 from tqdm import tqdm
 
 class Trainer:
-    def __init__(self, model, optimizer, scaler, scheduler, train_loader, valid_loader, test_dataset, test_path, ckp_path, device):
+    def __init__(self, model, optimizer, scaler, scheduler, train_loader, valid_loader, test_dataset, test_path, ckp_path, device, multi_gpu=False):
         self.model = model
         self.optimizer = optimizer
         self.scaler = scaler
@@ -24,6 +24,8 @@ class Trainer:
         self.test_path = test_path
         self.ckp_path = ckp_path
         self.device = device
+
+        self.multi_gpu = multi_gpu
 
         # load checkpoint
         if os.path.isfile(ckp_path):
@@ -141,7 +143,7 @@ class Trainer:
         torch.save(
             {
                 'epoch': self.epoch,
-                'model_state_dict': self.model.state_dict(),
+                'model_state_dict': self.model.module.state_dict() if self.multi_gpu else self.model.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'scheduler_state_dict': self.scheduler.state_dict(),
                 'scaler_state_dict': self.scaler.state_dict(),
@@ -150,6 +152,12 @@ class Trainer:
             }, 
             ckp_path
         )   
+
+        return True
+
+    def set_samplers_epoch(self, epoch):
+        self.train_loader.sampler.set_epoch(epoch)
+        self.valid_loader.sampler.set_epoch(epoch)
 
         return True
 

@@ -7,19 +7,16 @@ import os
 import random
 
 import numpy as np
-
-import wandb
 import torch
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.optim as optim
 from torch.utils.data import random_split
-
-import torch.multiprocessing as mp
 from torch.utils.data.distributed import DistributedSampler
-from torch.nn.parallel import DistributedDataParallel as DDP
 
+import wandb
 from data import MiniFlickrDataset, get_loader
-# from model import ddp_cleanup, ddp_setup, Net, Trainer
-from model import Net, Trainer
+from model import ddp_cleanup, ddp_setup, Net, Trainer
 from utils import Config, LRWarmup
 
 config = Config()
@@ -42,9 +39,18 @@ torch.manual_seed(config.seed)
 torch.cuda.manual_seed(config.seed)
 torch.backends.cudnn.deterministic = True
 
-def main(config, ckp_name):
+def main(rank, world_size, config, ckp_name=''):
+    # more than 1 GPU
     is_cuda = torch.cuda.is_available()
-    device = 'cuda' if is_cuda else 'cpu'
+    MULTIGPU = world_size > 1
+
+    if MULTIGPU:
+        ddp_setup(rank, world_size)
+        device = rank
+   
+    else:
+        device = torch.device('cuda' if is_cuda else 'cpu')
+
     model = Net(
         ep_len=config.ep_len,
         num_layers=config.num_layers, 
@@ -54,6 +60,9 @@ def main(config, ckp_name):
         max_len=config.max_len,
         device=device
     )
+
+    if MULTIGPU:
+        model = DDP(model, device_ids=[device])
 
     dataset = MiniFlickrDataset(os.path.join('data', 'processed', 'dataset.pkl'))
 
@@ -66,9 +75,10 @@ def main(config, ckp_name):
     train_loader = get_loader(
         train_dataset, 
         bs_exp=config.batch_size_exp, 
-        shuffle=True, 
+        shuffle=not MULTIGPU, 
         num_workers=config.num_workers if is_cuda else 0,
-        pin_memory=is_cuda
+        pin_memory=is_cuda,
+        sampler=DistributedSampler(train_dataset) if MULTIGPU else None
     )
 
     valid_loader = get_loader(
@@ -76,7 +86,8 @@ def main(config, ckp_name):
         bs_exp=config.batch_size_exp, 
         shuffle=False, 
         num_workers=config.num_workers if is_cuda else 0,
-        pin_memory=is_cuda
+        pin_memory=is_cuda,
+        sampler=DistributedSampler(val_dataset) if MULTIGPU else None
     )
 
     optimizer = optim.Adam(model.parameters(), lr=config.lr)
@@ -105,6 +116,9 @@ def main(config, ckp_name):
     wandb.init(project='clipXgpt2 captioner', config=config.__dict__)
     wandb.watch(trainer.model, log='all')
     for epoch in range(trainer.epoch, config.epochs):
+        if MULTIGPU:
+            trainer.set_samplers_epoch(epoch)
+
         trainer.train_epoch()
         trainer.valid_epoch()
         trainer.test_result()
@@ -122,8 +136,15 @@ def main(config, ckp_name):
         if not os.path.exists(config.weights_dir):
             os.makedirs(config.weights_dir)
 
-        if (epoch + 1) % 10 == 0: 
-            trainer.save_ckp(os.path.join(config.weights_dir, f'epoch_{epoch}.pt'))
+        if (epoch + 1) % 10 == 0 and rank == 0:
+            trainer.save_ckp(os.path.join(config.weights_dir, f'epoch_{epoch + 1}.pt'))
+
+    ddp_cleanup()
+
 
 if __name__ == '__main__':
-    main(config, args.checkpoint_name)
+    # check if there is no GPU - use CPU -> world_size = 1
+    
+    world_size = torch.cuda.device_count() if torch.cuda.is_available() else 1
+
+    mp.spawn(main, args=(world_size, config, ''), nprocs=world_size)

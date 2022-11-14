@@ -39,7 +39,7 @@ def cl_fn(batch, tokenizer):
 
     return img_emb, input_ids, attention_mask
 
-def get_loader(dataset, bs_exp=5, shuffle=True, num_workers=0, pin_memory=False):
+def get_loader(dataset, bs_exp=5, shuffle=True, num_workers=0, pin_memory=False, sampler=None):
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2-xl')
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -49,5 +49,6 @@ def get_loader(dataset, bs_exp=5, shuffle=True, num_workers=0, pin_memory=False)
         collate_fn=lambda b: cl_fn(b, tokenizer),
         shuffle=shuffle,
         num_workers=num_workers,
-        pin_memory=pin_memory
+        pin_memory=pin_memory,
+        sampler=sampler
     )

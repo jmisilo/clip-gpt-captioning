@@ -1,17 +1,29 @@
 '''
     Module contains final Model and all pieces of it.
 '''
+import os
 
 import torch
 import torch.nn as nn
-# from torch.distributed import init_process_group, destroy_process_group
+from torch.distributed import init_process_group, destroy_process_group
 from transformers import CLIPModel, CLIPProcessor, GPT2LMHeadModel, GPT2Tokenizer
 
-# def ddp_setup(rank, world_size):
-#     init_process_group('nccl', rank=rank, world_size=world_size)
+def ddp_setup(rank, world_size):
+    '''
+        Setup distributed training.
+    '''
 
-# def ddp_cleanup():
-#     destroy_process_group()
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+    
+    init_process_group('nccl', rank=rank, world_size=world_size)
+
+def ddp_cleanup():
+    '''
+        Cleanup distributed training.
+    '''
+
+    destroy_process_group()
 
 class ImageEncoder(nn.Module):
     '''
