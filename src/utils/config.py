@@ -18,7 +18,7 @@ class Config:
     epochs: int = 150
     lr: int = 3e-3
     k: float = 0.33
-    batch_size_exp: int = 6
+    batch_size_exp: int = 7
     ep_len: int = 4
     num_layers: int = 6
     n_heads: int = 16
