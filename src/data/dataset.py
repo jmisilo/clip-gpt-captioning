@@ -6,6 +6,7 @@
     * get_loader returns DataLoader object.
 '''
 
+import os
 import pickle
 
 import numpy as np
@@ -14,8 +15,20 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import GPT2Tokenizer
 
+from utils import download_dataset
+
 class MiniFlickrDataset(Dataset):
     def __init__(self, path): 
+        # check if file is file
+        if not os.path.isfile(path):
+            print('Dataset file not found. Downloading...')
+
+            # create data directory and in it create processed directory
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            
+            # download dataset
+            download_dataset(path)
+
         with open(path, 'rb') as f:
             self.data = pickle.load(f)
 
@@ -40,7 +53,7 @@ def cl_fn(batch, tokenizer):
     return img_emb, input_ids, attention_mask
 
 def get_loader(dataset, bs_exp=5, shuffle=True, num_workers=0, pin_memory=False):
-    tokenizer = GPT2Tokenizer.from_pretrained('gpt2-xl')
+    tokenizer = GPT2Tokenizer.from_pretrained('gpt2-medium')
     tokenizer.pad_token = tokenizer.eos_token
 
     return DataLoader(

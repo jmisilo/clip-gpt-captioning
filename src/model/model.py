@@ -1,7 +1,6 @@
 '''
     Module contains final Model and all pieces of it.
 '''
-
 import torch
 import torch.nn as nn
 from transformers import CLIPModel, CLIPProcessor, GPT2LMHeadModel, GPT2Tokenizer
@@ -16,8 +15,8 @@ class ImageEncoder(nn.Module):
         
         self.device = device
 
-        self.preprocessor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch14')
-        self.model = CLIPModel.from_pretrained('openai/clip-vit-base-patch14').vision_model.to(self.device)
+        self.preprocessor = CLIPProcessor.from_pretrained('openai/clip-vit-large-patch14')
+        self.model = CLIPModel.from_pretrained('openai/clip-vit-large-patch14').vision_model.to(self.device)
 
     def forward(self, image):
         # only one image at a time
@@ -98,10 +97,10 @@ class TextDecoder(nn.Module):
         
         self.device = device
         
-        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2-medium')
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        self.model = GPT2LMHeadModel.from_pretrained('gpt2').to(self.device)
+        self.model = GPT2LMHeadModel.from_pretrained('gpt2-medium').to(self.device)
         self.vocab_size = self.model.config.vocab_size
 
     def forward(self, embedding, attention_mask=None):
@@ -117,7 +116,6 @@ class Net(nn.Module):
     def __init__(self, ep_len, num_layers, n_heads, forward_expansion, dropout, max_len, device='cpu'):
         '''
             Model constructor.
-
             Args:
                 num_layers: number of layers in the TransformerEncoder
                 n_heads: number of heads in the MultiHeadAttention
@@ -149,10 +147,8 @@ class Net(nn.Module):
     def forward(self, img, temperature=1.0):
         '''
             Caption generation for a single image.
-
             Args:
                 img: image to generate caption for [PIL.Image]
-
             Returns:
                 caption: generated caption [str]
                 tokens: generated tokens [torch.Tensor]
@@ -251,7 +247,7 @@ if __name__ == '__main__':
     
     m.train()
     N = 10
-    emb = 768
+    emb = 1024
     length = 20
 
     l = m.train_forward(

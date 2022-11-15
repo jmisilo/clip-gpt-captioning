@@ -23,6 +23,6 @@ class Config:
     num_layers: int = 6
     n_heads: int = 16
     forward_expansion: int = 4
-    max_len: int = 20
+    max_len: int = 30
     dropout: float = 0.1
     weights_dir: str = 'weights'
