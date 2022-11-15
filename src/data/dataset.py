@@ -25,6 +25,7 @@ class MiniFlickrDataset(Dataset):
 
             # create data directory and in it create processed directory
             os.makedirs(os.path.dirname(path), exist_ok=True)
+            
             # download dataset
             download_dataset(path)
 
@@ -51,8 +52,8 @@ def cl_fn(batch, tokenizer):
 
     return img_emb, input_ids, attention_mask
 
-def get_loader(dataset, bs_exp=5, shuffle=True, num_workers=0, pin_memory=False, sampler=None):
-    tokenizer = GPT2Tokenizer.from_pretrained('gpt2-xl')
+def get_loader(dataset, bs_exp=5, shuffle=True, num_workers=0, pin_memory=False):
+    tokenizer = GPT2Tokenizer.from_pretrained('gpt2-medium')
     tokenizer.pad_token = tokenizer.eos_token
 
     return DataLoader(
@@ -61,6 +62,5 @@ def get_loader(dataset, bs_exp=5, shuffle=True, num_workers=0, pin_memory=False,
         collate_fn=lambda b: cl_fn(b, tokenizer),
         shuffle=shuffle,
         num_workers=num_workers,
-        pin_memory=pin_memory,
-        sampler=sampler
+        pin_memory=pin_memory
     )

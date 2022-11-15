@@ -13,7 +13,7 @@ import torch
 from tqdm import tqdm
 
 class Trainer:
-    def __init__(self, model, optimizer, scaler, scheduler, train_loader, valid_loader, test_dataset, test_path, ckp_path, device, multi_gpu=False):
+    def __init__(self, model, optimizer, scaler, scheduler, train_loader, valid_loader, test_dataset, test_path, ckp_path, device):
         self.model = model
         self.optimizer = optimizer
         self.scaler = scaler
@@ -24,8 +24,6 @@ class Trainer:
         self.test_path = test_path
         self.ckp_path = ckp_path
         self.device = device
-
-        self.multi_gpu = multi_gpu
 
         # load checkpoint
         if os.path.isfile(ckp_path):
@@ -72,8 +70,6 @@ class Trainer:
         self.train_loss.append(total_loss / (batch_idx + 1))
 
         self.scheduler.step()
-
-        return True
     
     def valid_epoch(self):
         self.model.eval()
@@ -97,8 +93,6 @@ class Trainer:
                     loop.refresh()
 
         self.valid_loss.append(total_loss / (batch_idx + 1))
-
-        return True
 
     def test_step(self, num_examples=4):
         assert num_examples % 2 == 0, 'num_examples must be even'
@@ -129,8 +123,6 @@ class Trainer:
 
         self.test_result = Image.open(buf)
 
-        return True
-
     def get_training_data(self):
         return {
             'train_loss': self.train_loss, 
@@ -152,14 +144,6 @@ class Trainer:
             }, 
             ckp_path
         )   
-
-        return True
-
-    def set_samplers_epoch(self, epoch):
-        self.train_loader.sampler.set_epoch(epoch)
-        self.valid_loader.sampler.set_epoch(epoch)
-
-        return True
 
     def _load_ckp(
         self, 

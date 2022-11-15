@@ -1,29 +1,9 @@
 '''
     Module contains final Model and all pieces of it.
 '''
-import os
-
 import torch
 import torch.nn as nn
-from torch.distributed import init_process_group, destroy_process_group
 from transformers import CLIPModel, CLIPProcessor, GPT2LMHeadModel, GPT2Tokenizer
-
-def ddp_setup(rank, world_size):
-    '''
-        Setup distributed training.
-    '''
-
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
-    
-    init_process_group('nccl', rank=rank, world_size=world_size)
-
-def ddp_cleanup():
-    '''
-        Cleanup distributed training.
-    '''
-
-    destroy_process_group()
 
 class ImageEncoder(nn.Module):
     '''
@@ -54,8 +34,7 @@ class Mapping(nn.Module):
         self, 
         ep_len,
         num_layers,
-        embed_size_inp,
-        embed_size_out,
+        embed_size, 
         n_heads, 
         forward_expansion, 
         dropout, 
@@ -64,56 +43,35 @@ class Mapping(nn.Module):
         super(Mapping, self).__init__()
         
         self.ep_len = ep_len
-        self.embed_size_inp = embed_size_inp
-        self.embed_size_out = embed_size_out
+        self.embed_size = embed_size
 
         self.device = device
 
-        num_layers_inp = num_layers // 2
-        num_layers_out = num_layers - num_layers_inp
-
         self.transformer_encoder = nn.TransformerEncoder(
             nn.TransformerEncoderLayer(
-                d_model=self.embed_size_inp, 
+                d_model=embed_size, 
                 nhead=n_heads, 
-                dim_feedforward=self.embed_size_inp*forward_expansion, 
+                dim_feedforward=embed_size*forward_expansion, 
                 dropout=dropout, 
                 batch_first=True, 
                 device=device
             ),
-            num_layers=num_layers_inp
+            num_layers=num_layers
         ).to(self.device)
 
-        self.translator = nn.Linear(self.embed_size_inp, self.embed_size_out).to(self.device)
-
-        self.transformer_decoder = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(
-                d_model=self.embed_size_out, 
-                nhead=n_heads, 
-                dim_feedforward=self.embed_size_out*forward_expansion, 
-                dropout=dropout, 
-                batch_first=True, 
-                device=device
-            ),
-            num_layers=num_layers_out
-        ).to(self.device)
-
-        self.mapper = nn.Linear(self.embed_size_out, ep_len * self.embed_size_out).to(self.device)
+        self.mapper = nn.Linear(embed_size, ep_len * embed_size).to(self.device)
 
         self.init_weights()
 
     def forward(self, img_embedded, train_mode=False):
         x = self.transformer_encoder(img_embedded)
-        x = self.translator(x)
-
-        x = self.transformer_decoder(x)
         x = self.mapper(x)
 
         x = x.view(
             *(
-                [-1, self.ep_len, self.embed_size_out] 
+                [-1, self.ep_len, self.embed_size] 
                 if train_mode else 
-                [self.ep_len, self.embed_size_out]
+                [self.ep_len, self.embed_size]
             )
         ) # for batched input
 
@@ -139,10 +97,10 @@ class TextDecoder(nn.Module):
         
         self.device = device
         
-        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2-xl')
+        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2-medium')
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        self.model = GPT2LMHeadModel.from_pretrained('gpt2-xl').to(self.device)
+        self.model = GPT2LMHeadModel.from_pretrained('gpt2-medium').to(self.device)
         self.vocab_size = self.model.config.vocab_size
 
     def forward(self, embedding, attention_mask=None):
@@ -158,7 +116,6 @@ class Net(nn.Module):
     def __init__(self, ep_len, num_layers, n_heads, forward_expansion, dropout, max_len, device='cpu'):
         '''
             Model constructor.
-
             Args:
                 num_layers: number of layers in the TransformerEncoder
                 n_heads: number of heads in the MultiHeadAttention
@@ -168,25 +125,15 @@ class Net(nn.Module):
         '''
         super(Net, self).__init__()
 
-        assert num_layers >= 2, 'Number of layers must be at least 2.'
-
         self.device = device
         self.ep_len = ep_len
 
         self.ie = ImageEncoder(device=device)
+        self.mp = Mapping(ep_len=self.ep_len, num_layers=num_layers, embed_size=self.ie.model.config.hidden_size, n_heads=n_heads, forward_expansion=forward_expansion, dropout=dropout, device=device)
         self.td = TextDecoder(device=device)
-
-        self.mp = Mapping(
-            ep_len=self.ep_len, 
-            num_layers=num_layers, 
-            embed_size_inp=self.ie.model.config.hidden_size, 
-            embed_size_out=self.td.model.config.hidden_size, 
-            n_heads=n_heads, 
-            forward_expansion=forward_expansion, 
-            dropout=dropout, 
-            device=device
-        )
         
+        assert self.ie.model.config.hidden_size == self.td.model.config.n_embd, "Embedding size of models mismatch"
+
         self.max_len = max_len
 
         self.criterion = nn.CrossEntropyLoss(ignore_index=self.td.tokenizer.pad_token_id)
@@ -200,10 +147,8 @@ class Net(nn.Module):
     def forward(self, img, temperature=1.0):
         '''
             Caption generation for a single image.
-
             Args:
                 img: image to generate caption for [PIL.Image]
-
             Returns:
                 caption: generated caption [str]
                 tokens: generated tokens [torch.Tensor]
