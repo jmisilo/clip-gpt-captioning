@@ -13,7 +13,19 @@ import torch
 from tqdm import tqdm
 
 class Trainer:
-    def __init__(self, model, optimizer, scaler, scheduler, train_loader, valid_loader, test_dataset, test_path, ckp_path, device):
+    def __init__(
+        self, 
+        model, 
+        optimizer, 
+        scaler, 
+        scheduler, 
+        train_loader, 
+        valid_loader, 
+        test_dataset='./data', 
+        test_path='', 
+        ckp_path='', 
+        device='cpu'
+    ):
         self.model = model
         self.optimizer = optimizer
         self.scaler = scaler

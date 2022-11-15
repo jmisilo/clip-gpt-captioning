@@ -36,19 +36,10 @@ torch.manual_seed(config.seed)
 torch.cuda.manual_seed(config.seed)
 torch.backends.cudnn.deterministic = True
 
-def train(config, ckp_name=''):
+if __name__ == '__main__':
+
     is_cuda = torch.cuda.is_available()
     device = torch.device('cuda' if is_cuda else 'cpu')
-   
-    model = Net(
-        ep_len=config.ep_len,
-        num_layers=config.num_layers, 
-        n_heads=config.n_heads, 
-        forward_expansion=config.forward_expansion, 
-        dropout=config.dropout, 
-        max_len=config.max_len,
-        device=device
-    )
 
     dataset = MiniFlickrDataset(os.path.join('data', 'processed', 'dataset.pkl'))
 
@@ -74,6 +65,16 @@ def train(config, ckp_name=''):
         pin_memory=is_cuda
     )
 
+    model = Net(
+        ep_len=config.ep_len,
+        num_layers=config.num_layers, 
+        n_heads=config.n_heads, 
+        forward_expansion=config.forward_expansion, 
+        dropout=config.dropout, 
+        max_len=config.max_len,
+        device=device
+    )
+
     optimizer = optim.Adam(model.parameters(), lr=config.lr)
 
     warmup = LRWarmup(epochs=config.epochs, max_lr=config.lr, k=config.k)
@@ -81,7 +82,7 @@ def train(config, ckp_name=''):
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, warmup.lr_warmup)
     scaler = torch.cuda.amp.GradScaler()    
 
-    ckp_path = os.path.join(config.weights_dir, ckp_name)
+    ckp_path = os.path.join(config.weights_dir, args.checkpoint_name)
 
     trainer = Trainer(
         model=model,
@@ -119,6 +120,3 @@ def train(config, ckp_name=''):
 
         if (epoch + 1) % 50 == 0:
             trainer.save_ckp(os.path.join(config.weights_dir, f'epoch_{epoch + 1}.pt'))
-
-if __name__ == '__main__':
-    train(config, args.checkpoint_name)
