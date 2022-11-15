@@ -35,8 +35,8 @@ class ImageEncoder(nn.Module):
         
         self.device = device
 
-        self.preprocessor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch14')
-        self.model = CLIPModel.from_pretrained('openai/clip-vit-base-patch14').vision_model.to(self.device)
+        self.preprocessor = CLIPProcessor.from_pretrained('openai/clip-vit-large-patch14')
+        self.model = CLIPModel.from_pretrained('openai/clip-vit-large-patch14').vision_model.to(self.device)
 
     def forward(self, image):
         # only one image at a time
@@ -54,7 +54,8 @@ class Mapping(nn.Module):
         self, 
         ep_len,
         num_layers,
-        embed_size, 
+        embed_size_inp,
+        embed_size_out,
         n_heads, 
         forward_expansion, 
         dropout, 
@@ -63,35 +64,56 @@ class Mapping(nn.Module):
         super(Mapping, self).__init__()
         
         self.ep_len = ep_len
-        self.embed_size = embed_size
+        self.embed_size_inp = embed_size_inp
+        self.embed_size_out = embed_size_out
 
         self.device = device
 
+        num_layers_inp = num_layers // 2
+        num_layers_out = num_layers - num_layers_inp
+
         self.transformer_encoder = nn.TransformerEncoder(
             nn.TransformerEncoderLayer(
-                d_model=embed_size, 
+                d_model=self.embed_size_inp, 
                 nhead=n_heads, 
-                dim_feedforward=embed_size*forward_expansion, 
+                dim_feedforward=self.embed_size_inp*forward_expansion, 
                 dropout=dropout, 
                 batch_first=True, 
                 device=device
             ),
-            num_layers=num_layers
+            num_layers=num_layers_inp
         ).to(self.device)
 
-        self.mapper = nn.Linear(embed_size, ep_len * embed_size).to(self.device)
+        self.translator = nn.Linear(self.embed_size_inp, self.embed_size_out).to(self.device)
+
+        self.transformer_decoder = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(
+                d_model=self.embed_size_out, 
+                nhead=n_heads, 
+                dim_feedforward=self.embed_size_out*forward_expansion, 
+                dropout=dropout, 
+                batch_first=True, 
+                device=device
+            ),
+            num_layers=num_layers_out
+        ).to(self.device)
+
+        self.mapper = nn.Linear(self.embed_size_out, ep_len * self.embed_size_out).to(self.device)
 
         self.init_weights()
 
     def forward(self, img_embedded, train_mode=False):
         x = self.transformer_encoder(img_embedded)
+        x = self.translator(x)
+
+        x = self.transformer_decoder(x)
         x = self.mapper(x)
 
         x = x.view(
             *(
-                [-1, self.ep_len, self.embed_size] 
+                [-1, self.ep_len, self.embed_size_out] 
                 if train_mode else 
-                [self.ep_len, self.embed_size]
+                [self.ep_len, self.embed_size_out]
             )
         ) # for batched input
 
@@ -117,10 +139,10 @@ class TextDecoder(nn.Module):
         
         self.device = device
         
-        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2-xl')
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        self.model = GPT2LMHeadModel.from_pretrained('gpt2').to(self.device)
+        self.model = GPT2LMHeadModel.from_pretrained('gpt2-xl').to(self.device)
         self.vocab_size = self.model.config.vocab_size
 
     def forward(self, embedding, attention_mask=None):
@@ -146,15 +168,25 @@ class Net(nn.Module):
         '''
         super(Net, self).__init__()
 
+        assert num_layers >= 2, 'Number of layers must be at least 2.'
+
         self.device = device
         self.ep_len = ep_len
 
         self.ie = ImageEncoder(device=device)
-        self.mp = Mapping(ep_len=self.ep_len, num_layers=num_layers, embed_size=self.ie.model.config.hidden_size, n_heads=n_heads, forward_expansion=forward_expansion, dropout=dropout, device=device)
         self.td = TextDecoder(device=device)
-        
-        assert self.ie.model.config.hidden_size == self.td.model.config.n_embd, "Embedding size of models mismatch"
 
+        self.mp = Mapping(
+            ep_len=self.ep_len, 
+            num_layers=num_layers, 
+            embed_size_inp=self.ie.model.config.hidden_size, 
+            embed_size_out=self.td.model.config.hidden_size, 
+            n_heads=n_heads, 
+            forward_expansion=forward_expansion, 
+            dropout=dropout, 
+            device=device
+        )
+        
         self.max_len = max_len
 
         self.criterion = nn.CrossEntropyLoss(ignore_index=self.td.tokenizer.pad_token_id)
@@ -270,7 +302,7 @@ if __name__ == '__main__':
     
     m.train()
     N = 10
-    emb = 768
+    emb = 1024
     length = 20
 
     l = m.train_forward(

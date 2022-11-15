@@ -121,7 +121,6 @@ def main(rank, world_size, config, ckp_name=''):
 
         trainer.train_epoch()
         trainer.valid_epoch()
-        trainer.test_result()
 
         metadata = trainer.get_training_data()
 
@@ -130,21 +129,21 @@ def main(rank, world_size, config, ckp_name=''):
             'train_loss': metadata['train_loss'],
             'valid_loss': metadata['valid_loss'],
             'lr': metadata['lr'],
-            'examples': wandb.Image(metadata['examples'])
         })
 
         if not os.path.exists(config.weights_dir):
             os.makedirs(config.weights_dir)
 
-        if (epoch + 1) % 10 == 0 and rank == 0:
+        if (epoch + 1) % 50 == 0 and rank == 0:
             trainer.save_ckp(os.path.join(config.weights_dir, f'epoch_{epoch + 1}.pt'))
 
     ddp_cleanup()
 
 
 if __name__ == '__main__':
-    # check if there is no GPU - use CPU -> world_size = 1
-    
+    # check if there is no GPU - use CPU -> world_size = 1    
     world_size = torch.cuda.device_count() if torch.cuda.is_available() else 1
+
+    print(f'Number of GPUs: {world_size}')
 
     mp.spawn(main, args=(world_size, config, ''), nprocs=world_size)
