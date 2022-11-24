@@ -6,3 +6,4 @@ Pillow==9.3.0
 torch==1.13.0+cu117
 tqdm==4.64.1
 transformers==4.22.1
+wandb==0.13.4
