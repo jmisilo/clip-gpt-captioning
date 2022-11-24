@@ -3,6 +3,7 @@ matplotlib==3.6.0
 numpy==1.23.3
 pandas==1.5.0
 Pillow==9.3.0
-torch==1.12.1+cu116
+torch==1.13.0+cu117
 tqdm==4.64.1
 transformers==4.22.1
+wandb==0.13.4

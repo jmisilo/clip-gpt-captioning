@@ -28,8 +28,8 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Load CLIP model and processor
-    preprocessor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32')
-    model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32').vision_model.to(device)
+    preprocessor = CLIPProcessor.from_pretrained('openai/clip-vit-large-patch14')
+    model = CLIPModel.from_pretrained('openai/clip-vit-large-patch14').vision_model.to(device)
 
     # Load dataset
     df = pd.read_csv(os.path.join(DATA_PATH, 'raw', 'results.csv'), sep='|')
