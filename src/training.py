@@ -14,9 +14,8 @@ from torch.utils.data import random_split
 import wandb
 from data import MiniFlickrDataset, get_loader
 from model import Net, Trainer
-from utils import Config, LRWarmup
+from utils import ConfigS, ConfigL, LRWarmup
 
-config = Config()
 parser = argparse.ArgumentParser()
 
 parser.add_argument(
@@ -27,7 +26,18 @@ parser.add_argument(
     help='Checkpoint name'
 )
 
+parser.add_argument(
+    '-S', 
+    '--size',
+    type=str,
+    default='S',
+    help='Model size [S, L]',
+    choices=['S', 'L', 's', 'l']
+)
+
 args = parser.parse_args()
+
+config = ConfigL() if args.size.upper() else ConfigS()
 
 # set seed
 random.seed(config.seed)
@@ -37,7 +47,6 @@ torch.cuda.manual_seed(config.seed)
 torch.backends.cudnn.deterministic = True
 
 if __name__ == '__main__':
-
     is_cuda = torch.cuda.is_available()
     device = torch.device('cuda' if is_cuda else 'cpu')
 
@@ -66,6 +75,8 @@ if __name__ == '__main__':
     )
 
     model = Net(
+        clip_model=config.clip_model,
+        clip_size=config.clip_size,
         ep_len=config.ep_len,
         num_layers=config.num_layers, 
         n_heads=config.n_heads, 
@@ -103,14 +114,14 @@ if __name__ == '__main__':
     for epoch in range(trainer.epoch, config.epochs):
         trainer.train_epoch()
         trainer.valid_epoch()
-        trainer.test_result()
+        trainer.test_step()
 
         metadata = trainer.get_training_data()
 
         # log loss to wandb
         wandb.log({
-            'train_loss': metadata['train_loss'],
-            'valid_loss': metadata['valid_loss'],
+            'train_loss/loss': metadata['train_loss'][-1],
+            'valid_loss/loss': metadata['valid_loss'][-1],
             'lr': metadata['lr'],
             'examples': wandb.Image(metadata['examples']),
         })
@@ -118,5 +129,5 @@ if __name__ == '__main__':
         if not os.path.exists(config.weights_dir):
             os.makedirs(config.weights_dir)
 
-        if (epoch + 1) % 50 == 0:
+        if (epoch + 1) % 6 == 0:
             trainer.save_ckp(os.path.join(config.weights_dir, f'epoch_{epoch + 1}.pt'))

@@ -15,19 +15,11 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import GPT2Tokenizer
 
-from utils import download_dataset
-
 class MiniFlickrDataset(Dataset):
     def __init__(self, path): 
         # check if file is file
         if not os.path.isfile(path):
-            print('Dataset file not found. Downloading...')
-
-            # create data directory and in it create processed directory
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            
-            # download dataset
-            download_dataset(path)
+            raise OSError('Dataset file not found. Downloading...')
 
         with open(path, 'rb') as f:
             self.data = pickle.load(f)

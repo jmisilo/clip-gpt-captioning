@@ -13,17 +13,25 @@ from PIL import Image
 import torch
 
 from model import Net
-from utils import Config, download_weights
+from utils import ConfigS, ConfigL, download_weights
 
-config = Config()
 parser = argparse.ArgumentParser()
 
 parser.add_argument(
     '-C', 
     '--checkpoint-name',
     type=str,
-    default='best.pt',
+    default='model.pt',
     help='Checkpoint name'
+)
+
+parser.add_argument(
+    '-S', 
+    '--size',
+    type=str,
+    default='S',
+    help='Model size [S, L]',
+    choices=['S', 'L', 's', 'l']
 )
 
 parser.add_argument(
@@ -52,6 +60,8 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+config = ConfigL() if args.size.upper() == 'L' else ConfigS()
+
 # set seed
 random.seed(config.seed)
 np.random.seed(config.seed)
@@ -73,6 +83,8 @@ if __name__ == '__main__':
     img = Image.open(args.img_path)
 
     model = Net(
+        clip_model=config.clip_model,
+        text_model=config.text_model,
         ep_len=config.ep_len,
         num_layers=config.num_layers, 
         n_heads=config.n_heads, 
@@ -81,15 +93,15 @@ if __name__ == '__main__':
         max_len=config.max_len,
         device=device
     )
-        
+
     if not os.path.exists(config.weights_dir):
         os.makedirs(config.weights_dir)
 
     if not os.path.isfile(ckp_path):
-        download_weights(ckp_path)
+        download_weights(ckp_path, args.size)
         
     checkpoint = torch.load(ckp_path, map_location=device)
-    model.load_state_dict(checkpoint)    
+    model.load_state_dict(checkpoint)
 
     model.eval()
 
@@ -100,7 +112,8 @@ if __name__ == '__main__':
     plt.title(caption)
     plt.axis('off')
 
-    plt.savefig(os.path.join(args.res_path, 'result.jpg'), bbox_inches='tight')
+    img_save_path = f'{os.path.split(args.img_path)[-1].split(".")[0]}-R{args.size.upper()}.jpg'
+    plt.savefig(os.path.join(args.res_path, img_save_path), bbox_inches='tight')
 
     plt.clf()
     plt.close()

@@ -1,5 +1,5 @@
 '''
-    Module contains all loops used in training and testing processes.
+    Module contains Trainer used in training and testing processes.
 '''
 
 import io
@@ -39,7 +39,16 @@ class Trainer:
 
         # load checkpoint
         if os.path.isfile(ckp_path):
-            self._load_ckp(ckp_path, optimizer, scheduler, scaler, device=device)
+            self._load_ckp(
+                ckp_path, 
+                optimizer=optimizer, 
+                scheduler=scheduler, 
+                scaler=scaler, 
+                epoch=True,
+                train_loss=True, 
+                valid_loss=True, 
+                device=device
+            )
 
         else:
             self.cur_lr = self.optimizer.param_groups[0]['lr']
@@ -88,7 +97,7 @@ class Trainer:
 
         total_loss = 0
 
-        loop = tqdm(self.loader, total=len(self.loader))
+        loop = tqdm(self.valid_loader, total=len(self.valid_loader))
         loop.set_description(f'Validation Loss: ---')
         for batch_idx, (img_emb, cap, att_mask) in enumerate(loop):
 
@@ -147,7 +156,7 @@ class Trainer:
         torch.save(
             {
                 'epoch': self.epoch,
-                'model_state_dict': self.model.module.state_dict() if self.multi_gpu else self.model.state_dict(),
+                'model_state_dict': self.model.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'scheduler_state_dict': self.scheduler.state_dict(),
                 'scaler_state_dict': self.scaler.state_dict(),
@@ -175,48 +184,20 @@ class Trainer:
         checkpoint = torch.load(checkpoint_fpath, map_location=device)
 
         self.model.load_state_dict(checkpoint['model_state_dict'])
-        if optimizer is not None:
+        if optimizer:
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-        if scheduler is not None:
+        if scheduler:
             self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         
-        if scaler is not None:
+        if scaler:
             self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
 
-        if epoch is not None:
-            self.epoch = checkpoint['epoch']
+        if epoch:
+            self.epoch = len(checkpoint['tloss'])
 
-        if train_loss is not None:
-            self.train_loss = checkpoint['train_loss']
+        if train_loss:
+            self.train_loss = checkpoint['tloss']
 
-        if valid_loss is not None:
-            self.valid_loss = checkpoint['valid_loss']
-
-def evaluate_dataset(model, dataset, img_path, save_path, temperature=1.0):
-    '''
-        Evaluate model on dataset.
-    
-        Args:
-            model: model to evaluate
-            dataset: dataset to evaluate on
-            img_path: path to images
-            save_path: path to save results
-    '''
-    model.eval()
-
-    loop = tqdm(dataset, total=len(dataset))
-    for img_name, _, _ in loop:
-        img = Image.open(os.path.join(img_path, img_name))
-
-        with torch.no_grad():
-            caption, _ = model(img, temperature)
-
-        plt.imshow(img)
-        plt.title(caption)
-        plt.axis('off')
-
-        plt.savefig(os.path.join(save_path, img_name), bbox_inches='tight')
-
-        plt.clf()
-        plt.close()
+        if valid_loss:
+            self.valid_loss = checkpoint['vloss']

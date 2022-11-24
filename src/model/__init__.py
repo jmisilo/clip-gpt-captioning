@@ -1,2 +1,2 @@
-from model.loops import *
+from model.trainer import *
 from model.model import *
