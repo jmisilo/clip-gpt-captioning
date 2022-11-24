@@ -263,12 +263,6 @@ if __name__ == '__main__':
         )
         print(l)
 
-        # total number ot parameters
-        print(sum(p.numel() for p in m.parameters() if p.requires_grad))
-
-        # number of trainable parameters
-        print(sum(p.numel() for p in m.parameters() if p.requires_grad and p.grad is not None))
-
         # number of parameters
         print(f'Total number of parameters: {sum(p.numel() for p in m.parameters())}')
         print(f'Number of trainable parameters: {sum(p.numel() for p in m.parameters() if p.requires_grad)}')
