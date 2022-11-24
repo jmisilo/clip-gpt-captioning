@@ -4,16 +4,11 @@
 
 import gdown
 
-def download_weights(checkpoint_fpath):
+def download_weights(checkpoint_fpath, model_size='L'):
     '''
         Downloads weights from Google Drive.
     '''
+
+    download_id = '12h-NgryAf6zZdA1KclHdfzU35D1icjEp' if model_size.strip().upper() == 'L' else '1p91KBj-oUmuMfG2Gc33tEN5Js5HpV8YH'
     
-    gdown.download('https://drive.google.com/uc?id=10ieSMMJzE9EeiPIF3CMzeT4timiQTjHV', checkpoint_fpath, quiet=False)
-
-def download_dataset(destination_path):
-    '''
-        Downloads dataset from Google Drive.
-    '''
-
-    gdown.download('https://drive.google.com/uc?id=1E7lKanGE2Gakgy3mvyUal_B43BxU3vHr', destination_path, quiet=False)
+    gdown.download(f'https://drive.google.com/uc?id={download_id}', checkpoint_fpath, quiet=False)

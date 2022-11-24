@@ -10,13 +10,13 @@ class ImageEncoder(nn.Module):
         Encodes image and returns it's embedding.
     '''
 
-    def __init__(self, device='cpu'):
+    def __init__(self, model, device='cpu'):
         super(ImageEncoder, self).__init__()
         
         self.device = device
 
-        self.preprocessor = CLIPProcessor.from_pretrained('openai/clip-vit-large-patch14')
-        self.model = CLIPModel.from_pretrained('openai/clip-vit-large-patch14').vision_model.to(self.device)
+        self.preprocessor = CLIPProcessor.from_pretrained(model)
+        self.model = CLIPModel.from_pretrained(model).vision_model.to(self.device)
 
     def forward(self, image):
         # only one image at a time
@@ -92,15 +92,15 @@ class TextDecoder(nn.Module):
         Processes embedding into caption.
     '''
 
-    def __init__(self, device='cpu'):
+    def __init__(self, model, device='cpu'):
         super(TextDecoder, self).__init__()
         
         self.device = device
         
-        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2-medium')
+        self.tokenizer = GPT2Tokenizer.from_pretrained(model)
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        self.model = GPT2LMHeadModel.from_pretrained('gpt2-medium').to(self.device)
+        self.model = GPT2LMHeadModel.from_pretrained(model).to(self.device)
         self.vocab_size = self.model.config.vocab_size
 
     def forward(self, embedding, attention_mask=None):
@@ -113,7 +113,7 @@ class Net(nn.Module):
         Final Model class. Puts all pieces together and generates caption based on image.
     '''
     
-    def __init__(self, ep_len, num_layers, n_heads, forward_expansion, dropout, max_len, device='cpu'):
+    def __init__(self, clip_model, text_model, ep_len, num_layers, n_heads, forward_expansion, dropout, max_len, device='cpu'):
         '''
             Model constructor.
             Args:
@@ -128,15 +128,16 @@ class Net(nn.Module):
         self.device = device
         self.ep_len = ep_len
 
-        self.ie = ImageEncoder(device=device)
+        self.ie = ImageEncoder(model=clip_model, device=device)
         self.mp = Mapping(ep_len=self.ep_len, num_layers=num_layers, embed_size=self.ie.model.config.hidden_size, n_heads=n_heads, forward_expansion=forward_expansion, dropout=dropout, device=device)
-        self.td = TextDecoder(device=device)
+        self.td = TextDecoder(model=text_model, device=device)
         
         assert self.ie.model.config.hidden_size == self.td.model.config.n_embd, "Embedding size of models mismatch"
 
         self.max_len = max_len
 
-        self.criterion = nn.CrossEntropyLoss(ignore_index=self.td.tokenizer.pad_token_id)
+        # self.criterion = nn.CrossEntropyLoss(ignore_index=self.td.tokenizer.pad_token_id) # chanded on epoch 91
+        self.criterion = nn.CrossEntropyLoss()
 
         self.freeze_layers()
 
@@ -197,9 +198,12 @@ class Net(nn.Module):
 
                 if last_token == self.td.tokenizer.eos_token_id:
                     break
-
-            decoded = self.td.tokenizer.decode(tokens)
             
+            decoded = self.td.tokenizer.decode(tokens[:-1])
+            
+            decoded = decoded.strip()
+            decoded = decoded[0].upper() + decoded[1:]
+
             return decoded, tokens
 
     def train_forward(self, img_emb, trg_cap, att_mask):
@@ -231,28 +235,40 @@ class Net(nn.Module):
         return loss
 
 if __name__ == '__main__':
-    
-    m = Net(
-        ep_len=3,
-        num_layers=6,
-        n_heads=16, 
-        forward_expansion=4, 
-        dropout=0.1, 
-        max_len=20
-    )
-    
-    m.eval()
-    r = m(torch.randn(3, 224, 224))
-    print(r)
-    
-    m.train()
-    N = 10
-    emb = 1024
-    length = 20
+    for clip, text in [['openai/clip-vit-base-patch32', 'gpt2'], ['openai/clip-vit-large-patch14', 'gpt2-medium']]:
+        m = Net(
+            clip_model=clip,
+            text_model=text,
+            ep_len=3,
+            num_layers=6,
+            n_heads=16, 
+            forward_expansion=4, 
+            dropout=0.1, 
+            max_len=20
+        )
 
-    l = m.train_forward(
-        torch.rand(N, emb), 
-        torch.randint(1, 50000, (N, length)), 
-        att_mask=torch.concat([torch.ones(N, length - 3), torch.zeros(N, 3)], dim=1)
-    )
-    print(l)
+        m.eval()
+        r = m(torch.randn(3, 224, 224))
+        print(r)
+
+        m.train()
+        N = 10
+        emb = m.td.model.config.n_embd
+        length = 20
+
+        l = m.train_forward(
+            torch.rand(N, emb), 
+            torch.randint(1, 50000, (N, length)), 
+            att_mask=torch.concat([torch.ones(N, length - 3), torch.zeros(N, 3)], dim=1)
+        )
+        print(l)
+
+        # total number ot parameters
+        print(sum(p.numel() for p in m.parameters() if p.requires_grad))
+
+        # number of trainable parameters
+        print(sum(p.numel() for p in m.parameters() if p.requires_grad and p.grad is not None))
+
+        # number of parameters
+        print(f'Total number of parameters: {sum(p.numel() for p in m.parameters())}')
+        print(f'Number of trainable parameters: {sum(p.numel() for p in m.parameters() if p.requires_grad)}')
