@@ -14,17 +14,19 @@ The training process was carried out using the [Kaggle](https://www.kaggle.com/)
 
 ### Model Versions
 
-> **Small** - [Download](https://drive.google.com/uc?id=1p91KBj-oUmuMfG2Gc33tEN5Js5HpV8YH)
-> * Text Model - GPT-2 Small - 124M parameters
-> * Mapping Module - 6x Transformer Encoder Layers
-> * CLIP Base - Patch 32 model 
-> * 256M Parameters
+> **Small** - [Download](https://drive.google.com/file/d/1pSQruQyg8KJq6VmzhMLFbT_VaHJMdlWF/view?usp=sharing)
+>
+> - Text Model - GPT-2 Small - 124M parameters
+> - Mapping Module - 6x Transformer Encoder Layers
+> - CLIP Base - Patch 32 model
+> - 256M Parameters
 
-> **Large** - [Download](https://drive.google.com/uc?id=12h-NgryAf6zZdA1KclHdfzU35D1icjEp)
-> * Text Model - GPT-2 Medium - 355M parameters
-> * Mapping Module - 5x Transformer Encoder Layers
-> * CLIP Large - Patch 14 model
-> * 736M Parameters
+> **Large** - [Download](https://drive.google.com/file/d/1Gh32arzhW06C1ZJyzcJSSfdJDi3RgWoG/view?usp=sharing)
+>
+> - Text Model - GPT-2 Medium - 355M parameters
+> - Mapping Module - 5x Transformer Encoder Layers
+> - CLIP Large - Patch 14 model
+> - 736M Parameters
 
 ## Example results
 
