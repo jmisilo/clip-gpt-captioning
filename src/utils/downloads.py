@@ -11,9 +11,9 @@ def download_weights(checkpoint_fpath, model_size="L"):
     """
 
     download_id = (
-        "1pSQruQyg8KJq6VmzhMLFbT_VaHJMdlWF"
+        "1Gh32arzhW06C1ZJyzcJSSfdJDi3RgWoG"
         if model_size.strip().upper() == "L"
-        else "1Gh32arzhW06C1ZJyzcJSSfdJDi3RgWoG"
+        else "1pSQruQyg8KJq6VmzhMLFbT_VaHJMdlWF"
     )
 
     gdown.download(
