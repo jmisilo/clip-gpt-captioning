@@ -1,18 +1,19 @@
-'''
+"""
     Project's main config.
-'''
+"""
 
 import os
 from dataclasses import dataclass
 
+
 @dataclass
 class ConfigS:
-    '''
-        Project's main config.
-    '''
+    """
+    Project's main config.
+    """
 
-    clip_model: str = 'openai/clip-vit-base-patch32'
-    text_model: str = 'gpt2'
+    clip_model: str = "openai/clip-vit-base-patch32"
+    text_model: str = "gpt2"
     seed: int = 100
     num_workers: int = 2
     train_size: int = 0.84
@@ -27,16 +28,17 @@ class ConfigS:
     forward_expansion: int = 4
     max_len: int = 40
     dropout: float = 0.1
-    weights_dir: str = os.path.join('weights', 'small')
+    weights_dir: str = os.path.join("weights", "small")
+
 
 @dataclass
 class ConfigL:
-    '''
-        Project's main config.
-    '''
+    """
+    Project's main config.
+    """
 
-    clip_model: str = 'openai/clip-vit-large-patch14'
-    text_model: str = 'gpt2-medium'
+    clip_model: str = "openai/clip-vit-large-patch14"
+    text_model: str = "gpt2-medium"
     seed: int = 100
     num_workers: int = 2
     train_size: int = 0.84
@@ -51,4 +53,4 @@ class ConfigL:
     forward_expansion: int = 4
     max_len: int = 40
     dropout: float = 0.08
-    weights_dir: str = os.path.join('weights', 'large')
+    weights_dir: str = os.path.join("weights", "large")
